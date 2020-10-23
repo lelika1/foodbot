@@ -3,12 +3,14 @@ package foodbot
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
 
 // Report ...
 type Report struct {
+	Time    time.Time
 	Product string
 	Kcal    uint32 // for 100g
 	Grams   uint32
@@ -67,6 +69,18 @@ func (db *DB) User(name string) (*User, error) {
 	}
 
 	return nil, ErrUserNotFound
+}
+
+// TodayReports ...
+func (db *DB) TodayReports(username string) ([]Report, error) {
+	user, err := db.User(username)
+	if err != nil {
+		return nil, err
+	}
+
+	reports := user.Today.Reports
+	sort.Slice(reports, func(i, j int) bool { return reports[i].Time.Before(reports[j].Time) })
+	return reports, nil
 }
 
 // WeeklyReport ...

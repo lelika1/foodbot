@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/lelika1/foodbot/internal/foodbot"
 
@@ -40,7 +42,8 @@ func main() {
 		case "/add":
 			msg.Text = "Add some food"
 		case "/stat":
-			msg.Text = "You ate today:"
+			msg.Text = todayReportResponse(update.Message.From.UserName, db)
+			msg.ParseMode = "MarkdownV2"
 		case "/stat7":
 			msg.Text = weeklyReport(update.Message.From.UserName, db)
 			msg.ParseMode = "MarkdownV2"
@@ -59,9 +62,60 @@ func weeklyReport(username string, db *foodbot.DB) string {
 	case nil:
 		return report
 	case foodbot.ErrUserNotFound:
-		return "You aren't a user of this bot."
+		return "You aren't a user of this bot\\."
 	}
 
 	log.Printf("WeeklyReport(%v) failed with %v", username, err)
-	return "Something went wrong. Try later."
+	return "Something went wrong\\. Try later\\."
+}
+
+func todayReportResponse(username string, db *foodbot.DB) string {
+	reports, err := db.TodayReports(username)
+	switch err {
+	case nil:
+		break
+	case foodbot.ErrUserNotFound:
+		return "You aren't a user of this bot\\."
+	default:
+		log.Printf("TodayReport(%v) failed with %v", username, err)
+		return "Something went wrong. Try later\\."
+	}
+
+	if len(reports) == 0 {
+		return "*You ate nothing so far\\.*"
+	}
+
+	preFormat := make([]struct {
+		begin  string
+		end    string
+		len    int
+		spaces int
+	}, len(reports))
+
+	var total uint32
+	maxLen := 0
+	for i, r := range reports {
+		preFormat[i].begin = fmt.Sprintf("%s: %v", r.Time.Format("15:04:05"), r.Product)
+		kcal := r.Kcal * r.Grams / 100
+		preFormat[i].end = fmt.Sprintf("%v kcal", kcal)
+
+		preFormat[i].len = len(preFormat[i].begin) + len(preFormat[i].end)
+		if maxLen < preFormat[i].len {
+			maxLen = preFormat[i].len
+		}
+
+		total += kcal
+	}
+
+	for i := range preFormat {
+		preFormat[i].spaces = maxLen - preFormat[i].len + 1
+	}
+
+	var sb strings.Builder
+	sb.WriteString("*You ate today:*\n")
+	for _, f := range preFormat {
+		fmt.Fprintf(&sb, "`%s%s`*%s*\n", f.begin, strings.Repeat(" ", f.spaces), f.end)
+	}
+	fmt.Fprintf(&sb, "\n`Total:` *%v kcal*\n", total)
+	return sb.String()
 }
