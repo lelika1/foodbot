@@ -30,6 +30,11 @@ func (d *Day) TotalKcal() uint32 {
 	return ret
 }
 
+// AddFood ...
+func (d *Day) AddFood(product string, kcal uint32, grams uint32) {
+	d.Reports = append(d.Reports, Report{time.Now(), product, kcal, grams})
+}
+
 // User ...
 type User struct {
 	Name    string
@@ -69,6 +74,17 @@ func (db *DB) User(name string) (*User, error) {
 	}
 
 	return nil, ErrUserNotFound
+}
+
+// AddFood ...
+func (db *DB) AddFood(username string, product string, kcal uint32, grams uint32) error {
+	user, err := db.User(username)
+	if err != nil {
+		return err
+	}
+
+	user.Today.AddFood(product, kcal, grams)
+	return nil
 }
 
 // TodayReports ...
