@@ -58,25 +58,30 @@ func main() {
 
 func weeklyReport(username string, db *foodbot.DB) string {
 	report, err := db.WeeklyReport(username)
-	switch err {
-	case nil:
-		return report
-	case foodbot.ErrUserNotFound:
+	if err == foodbot.ErrUserNotFound {
 		return "You aren't a user of this bot\\."
 	}
 
-	log.Printf("WeeklyReport(%v) failed with %v", username, err)
-	return "Something went wrong\\. Try later\\."
+	if err != nil {
+		log.Printf("WeeklyReport(%v) failed with %v", username, err)
+		return "Something went wrong\\. Try later\\."
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "`%s Today:         ` *%v kcal*\n", color(report.TodayInLimit), report.Today)
+	for _, r := range report.History {
+		fmt.Fprintf(&sb, "`%s %v:` *%v kcal*\n", color(r.InLimit), r.Date, r.Kcal)
+	}
+	return sb.String()
 }
 
 func todayReportResponse(username string, db *foodbot.DB) string {
 	reports, err := db.TodayReports(username)
-	switch err {
-	case nil:
-		break
-	case foodbot.ErrUserNotFound:
+	if err == foodbot.ErrUserNotFound {
 		return "You aren't a user of this bot\\."
-	default:
+	}
+
+	if err != nil {
 		log.Printf("TodayReport(%v) failed with %v", username, err)
 		return "Something went wrong. Try later\\."
 	}
@@ -85,37 +90,41 @@ func todayReportResponse(username string, db *foodbot.DB) string {
 		return "*You ate nothing so far\\.*"
 	}
 
-	preFormat := make([]struct {
-		begin  string
-		end    string
-		len    int
-		spaces int
-	}, len(reports))
-
-	var total uint32
-	maxLen := 0
-	for i, r := range reports {
-		preFormat[i].begin = fmt.Sprintf("%s: %v", r.Time.Format("15:04:05"), r.Product)
-		kcal := r.Kcal * r.Grams / 100
-		preFormat[i].end = fmt.Sprintf("%v kcal", kcal)
-
-		preFormat[i].len = len(preFormat[i].begin) + len(preFormat[i].end)
-		if maxLen < preFormat[i].len {
-			maxLen = preFormat[i].len
-		}
-
-		total += kcal
+	type Line struct {
+		Begin, End string
 	}
 
-	for i := range preFormat {
-		preFormat[i].spaces = maxLen - preFormat[i].len + 1
+	var lines []Line
+
+	var total uint32
+	var maxLen int
+	for i, r := range reports {
+		kcal := r.Kcal * r.Grams / 100
+		total += kcal
+
+		lines = append(lines, Line{
+			Begin: fmt.Sprintf("%s: %v", r.Time.Format("15:04:05"), r.Product),
+			End:   fmt.Sprintf("%v kcal", kcal),
+		})
+
+		if l := len(lines[i].Begin) + len(lines[i].End); maxLen < l {
+			maxLen = l
+		}
 	}
 
 	var sb strings.Builder
 	sb.WriteString("*You ate today:*\n")
-	for _, f := range preFormat {
-		fmt.Fprintf(&sb, "`%s%s`*%s*\n", f.begin, strings.Repeat(" ", f.spaces), f.end)
+	for _, line := range lines {
+		spaces := maxLen - (len(line.Begin) + len(line.End)) + 1
+		fmt.Fprintf(&sb, "`%s%s`*%s*\n", line.Begin, strings.Repeat(" ", spaces), line.End)
 	}
 	fmt.Fprintf(&sb, "\n`Total:` *%v kcal*\n", total)
 	return sb.String()
+}
+
+func color(inLimit bool) string {
+	if inLimit {
+		return "✅"
+	}
+	return "❌"
 }

@@ -2,9 +2,7 @@ package foodbot
 
 import (
 	"errors"
-	"fmt"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -32,7 +30,12 @@ func (d *Day) TotalKcal() uint32 {
 
 // AddFood ...
 func (d *Day) AddFood(product string, kcal uint32, grams uint32) {
-	d.Reports = append(d.Reports, Report{time.Now(), product, kcal, grams})
+	d.Reports = append(d.Reports, Report{
+		Time:    time.Now(),
+		Product: product,
+		Kcal:    kcal,
+		Grams:   grams,
+	})
 }
 
 // User ...
@@ -77,7 +80,7 @@ func (db *DB) User(name string) (*User, error) {
 }
 
 // AddFood ...
-func (db *DB) AddFood(username string, product string, kcal uint32, grams uint32) error {
+func (db *DB) AddFood(username, product string, kcal, grams uint32) error {
 	user, err := db.User(username)
 	if err != nil {
 		return err
@@ -99,31 +102,43 @@ func (db *DB) TodayReports(username string) ([]Report, error) {
 	return reports, nil
 }
 
+// ShortDayReport ...
+type ShortDayReport struct {
+	Date    string
+	Kcal    uint32
+	InLimit bool
+}
+
 // WeeklyReport ...
-func (db *DB) WeeklyReport(username string) (string, error) {
+type WeeklyReport struct {
+	Today        uint32
+	TodayInLimit bool
+	History      []ShortDayReport
+}
+
+// WeeklyReport ...
+func (db *DB) WeeklyReport(username string) (WeeklyReport, error) {
 	user, err := db.User(username)
 	if err != nil {
-		return "", err
+		return WeeklyReport{}, err
 	}
 
-	var sb strings.Builder
-
-	total := user.Today.TotalKcal()
-	fmt.Fprintf(&sb, "`%s Today:         ` *%v kcal*\n", color(total, user.Limit), total)
-
 	now := time.Now()
+	var history []ShortDayReport
 	for delta := 1; delta <= 6; delta++ {
 		key := now.AddDate(0, 0, -delta).Format("Mon 2006/01/02")
 		kcal := user.History[key]
-		fmt.Fprintf(&sb, "`%s %v:` *%v kcal*\n", color(kcal, user.Limit), key, kcal)
+		history = append(history, ShortDayReport{
+			Date:    key,
+			Kcal:    kcal,
+			InLimit: kcal < user.Limit,
+		})
 	}
-	return sb.String(), nil
 
-}
-
-func color(val, limit uint32) string {
-	if val < limit {
-		return "✅"
-	}
-	return "❌"
+	total := user.Today.TotalKcal()
+	return WeeklyReport{
+		Today:        total,
+		TodayInLimit: total < user.Limit,
+		History:      history,
+	}, nil
 }
