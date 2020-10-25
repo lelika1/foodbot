@@ -35,6 +35,8 @@ func NewUser(name string, limit uint32) *User {
 // RespondTo the given message from the user.
 func (u *User) RespondTo(msg string) string {
 	switch msg {
+	case "/start":
+		return "Input daily limit"
 	case "/add":
 		return "Add some food"
 	case "/stat":
@@ -42,7 +44,7 @@ func (u *User) RespondTo(msg string) string {
 	case "/stat7":
 		return formatWeeklyReport(u.weeklyReport())
 	}
-	return ""
+	return "I don't understand you\\."
 }
 
 // weeklyReport for this user.
