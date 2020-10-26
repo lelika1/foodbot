@@ -41,8 +41,23 @@ func NewUser(name string, limit uint32) *User {
 	}
 }
 
+func (u *User) cancel() (string, error) {
+	if u.State == AskedForLimit {
+		u.State = Default
+		return fmt.Sprintf("Canceled\\. The current limit is %v\\.", u.Limit), nil
+	}
+
+	u.last = Report{}
+	u.State = Default
+	return "Canceled\\.", nil
+}
+
 // RespondTo the given message from the user.
 func (u *User) RespondTo(msg string) (string, error) {
+	if msg == "/cancel" {
+		return u.cancel()
+	}
+
 	if u.State == AskedForLimit {
 		limit, err := strconv.ParseUint(msg, 10, 32)
 		if err != nil {
