@@ -45,7 +45,7 @@ func NewUser(name string, limit uint32) *User {
 func (u *User) RespondTo(msg string) (string, error) {
 	if msg == "/start" {
 		u.State = AskedForLimit
-		return "Hi! Input daily limit:", nil
+		return "Hi\\! Input daily limit:", nil
 	}
 
 	if msg == "/cancel" {

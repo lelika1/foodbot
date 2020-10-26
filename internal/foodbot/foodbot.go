@@ -1,26 +1,54 @@
 package foodbot
 
 import (
+	"bufio"
 	"errors"
+	"fmt"
+	"log"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
-// DB ...
+// DB stores all the information of the bot.
 type DB struct {
 	Users map[string]*User
 }
 
-// NewDB ...
-func NewDB() *DB {
-	return &DB{Users: map[string]*User{
-		"osycheva": NewUser("osycheva", 1546),
-	}}
+// NewDB loads DB from the given file, or creates a new one if file doesn't exist.
+func NewDB(path string) *DB {
+	// TODO use normal database
+	db := DB{Users: make(map[string]*User)}
+
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
+	defer file.Close()
+	if err != nil {
+		return &db
+	}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		userDescr := strings.Split(line, " ")
+		if len(userDescr) != 2 {
+			log.Panic(fmt.Errorf("wrong line in the db: %q", line))
+		}
+
+		limit, err := strconv.ParseUint(userDescr[1], 10, 32)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		db.Users[userDescr[0]] = NewUser(userDescr[0], uint32(limit))
+	}
+	return &db
 }
 
-// ErrUserNotFound ...
+// ErrUserNotFound means the bot doesn't have such user.
 var ErrUserNotFound = errors.New("user was not found")
 
-// User ...
+// User finds an user with the given name or returns an ErrUserNotFound if such user doesn't exists.
 func (db *DB) User(name string) (*User, error) {
 	if user, ok := db.Users[name]; ok {
 		return user, nil

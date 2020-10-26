@@ -10,18 +10,17 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		log.Fatalf("usage: %s bot_token", os.Args[0])
+	if len(os.Args) != 3 {
+		log.Fatalf("usage: %s bot_token database_path", os.Args[0])
 	}
-
-	db := foodbot.NewDB()
 
 	bot, err := tgbotapi.NewBotAPI(os.Args[1])
 	if err != nil {
 		log.Panic(err)
 	}
-
 	bot.Debug = true
+
+	db := foodbot.NewDB(os.Args[2])
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
@@ -48,7 +47,7 @@ func main() {
 			}
 
 		case foodbot.ErrUserNotFound:
-			msg.Text = "You aren't a user of this bot\\."
+			msg.Text = "You aren't a user of this bot."
 		default:
 			msg.Text = err.Error()
 		}
