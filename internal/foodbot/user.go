@@ -41,70 +41,26 @@ func NewUser(name string, limit uint32) *User {
 	}
 }
 
-func (u *User) cancel() (string, error) {
-	if u.State == AskedForLimit {
-		u.State = Default
-		return fmt.Sprintf("Canceled\\. The current limit is %v\\.", u.Limit), nil
-	}
-
-	u.last = Report{}
-	u.State = Default
-	return "Canceled\\.", nil
-}
-
 // RespondTo the given message from the user.
 func (u *User) RespondTo(msg string) (string, error) {
+	if msg == "/start" {
+		u.State = AskedForLimit
+		return "Hi! Input daily limit:", nil
+	}
+
 	if msg == "/cancel" {
-		return u.cancel()
+		return u.handleCancel()
 	}
 
 	if u.State == AskedForLimit {
-		limit, err := strconv.ParseUint(msg, 10, 32)
-		if err != nil {
-			return "", fmt.Errorf("%q is not a number. Input daily limit", msg)
-		}
-
-		u.Limit = uint32(limit)
-		u.State = Default
-		return "Limit was saved\\. Thanks\\!", nil
+		return u.handleLimit(msg)
 	}
 
-	if u.State == AskedForProduct {
-		u.last.Product = msg
-		u.State = AskedForKcal
-		return fmt.Sprintf("What is the calorie content of `%q`? Input kcal per 100g:", msg), nil
-	}
-
-	if u.State == AskedForKcal {
-		kcal, err := strconv.ParseUint(msg, 10, 32)
-		if err != nil {
-			return "", fmt.Errorf("%q is not a number. Input kcal per 100g", msg)
-		}
-
-		u.last.Kcal = uint32(kcal)
-		u.State = AskedForGrams
-		return fmt.Sprintf("How many grams of `%q` have you eaten?", u.last.Product), nil
-	}
-
-	if u.State == AskedForGrams {
-		grams, err := strconv.ParseUint(msg, 10, 32)
-		if err != nil {
-			return "", fmt.Errorf("%q is not a number. Input how many grams you've eaten", msg)
-		}
-
-		u.last.Grams = uint32(grams)
-
-		u.State = Default
-		u.Today.Reports = append(u.Today.Reports, u.last)
-		ret := fmt.Sprintf("%v grams of `%q` with %v kcal for 100g was saved\\. Thanks\\!", u.last.Grams, u.last.Product, u.last.Kcal)
-		u.last = Report{}
-		return ret, nil
+	if u.State == AskedForProduct || u.State == AskedForKcal || u.State == AskedForGrams {
+		return u.handleAdd(msg)
 	}
 
 	switch msg {
-	case "/start":
-		u.State = AskedForLimit
-		return "Input daily limit:", nil
 	case "/limit":
 		u.State = AskedForLimit
 		return "Input new daily limit:", nil
@@ -150,12 +106,61 @@ func (u *User) todayReports() []Report {
 	return reports
 }
 
-// AddFood consumed by this user.
-func (u *User) AddFood(product string, kcal, grams uint32) {
-	u.Today.Reports = append(u.Today.Reports, Report{
-		Time:    time.Now(),
-		Product: product,
-		Kcal:    kcal,
-		Grams:   grams,
-	})
+func (u *User) handleCancel() (string, error) {
+	if u.State == AskedForLimit {
+		u.State = Default
+		return fmt.Sprintf("Canceled\\. The current limit is %v\\.", u.Limit), nil
+	}
+
+	u.last = Report{}
+	u.State = Default
+	return "Canceled\\.", nil
+}
+
+func (u *User) handleLimit(msg string) (string, error) {
+	limit, err := strconv.ParseUint(msg, 10, 32)
+	if err != nil {
+		return "", fmt.Errorf("%q is not a number. Input daily limit", msg)
+	}
+
+	u.Limit = uint32(limit)
+	u.State = Default
+	return "Limit was saved\\. Thanks\\!", nil
+}
+
+func (u *User) handleAdd(msg string) (string, error) {
+	switch u.State {
+	case AskedForProduct:
+		u.last.Product = msg
+		u.State = AskedForKcal
+		return fmt.Sprintf("What is the calorie content of `%q`? Input kcal per 100g:", msg), nil
+
+	case AskedForKcal:
+		kcal, err := strconv.ParseUint(msg, 10, 32)
+		if err != nil {
+			return "", fmt.Errorf("%q is not a number. Input kcal per 100g", msg)
+		}
+
+		u.last.Kcal = uint32(kcal)
+		u.State = AskedForGrams
+		return fmt.Sprintf("How many grams of `%q` have you eaten?", u.last.Product), nil
+
+	case AskedForGrams:
+		grams, err := strconv.ParseUint(msg, 10, 32)
+		if err != nil {
+			return "", fmt.Errorf("%q is not a number. Input how many grams you've eaten", msg)
+		}
+
+		u.last.Grams = uint32(grams)
+		u.Today.Reports = append(u.Today.Reports, u.last)
+
+		ret := fmt.Sprintf("%v grams of `%q` with %v kcal for 100g was saved\\. Thanks\\!",
+			u.last.Grams, u.last.Product, u.last.Kcal)
+
+		u.last = Report{}
+		u.State = Default
+		return ret, nil
+	default:
+		return "", nil
+	}
 }
