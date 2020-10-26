@@ -39,8 +39,14 @@ func main() {
 		user, err := db.User(update.Message.From.UserName)
 		switch err {
 		case nil:
-			msg.Text = user.RespondTo(update.Message.Text)
-			msg.ParseMode = "MarkdownV2"
+			if text, err := user.RespondTo(update.Message.Text); err != nil {
+				msg.Text = err.Error()
+				msg.ReplyToMessageID = update.Message.MessageID
+			} else {
+				msg.Text = text
+				msg.ParseMode = "MarkdownV2"
+			}
+
 		case foodbot.ErrUserNotFound:
 			msg.Text = "You aren't a user of this bot\\."
 		default:

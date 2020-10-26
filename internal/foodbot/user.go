@@ -1,7 +1,10 @@
 package foodbot
 
 import (
+	"errors"
+	"fmt"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -29,22 +32,39 @@ func NewUser(name string, limit uint32) *User {
 		Name:    name,
 		Limit:   limit,
 		History: make(map[string]uint32),
+		State:   Default,
 	}
 }
 
 // RespondTo the given message from the user.
-func (u *User) RespondTo(msg string) string {
+func (u *User) RespondTo(msg string) (string, error) {
+	if u.State == AskedForLimit {
+		limit, err := strconv.ParseUint(msg, 10, 32)
+		if err != nil {
+			return "", fmt.Errorf("%q is not a number. Input daily limit", msg)
+		}
+
+		u.Limit = uint32(limit)
+		u.State = Default
+		return "Limit was saved\\. Thanks\\!", nil
+	}
+
 	switch msg {
 	case "/start":
-		return "Input daily limit"
+		u.State = AskedForLimit
+		return "Input daily limit:", nil
+	case "/limit":
+		u.State = AskedForLimit
+		return "Input new daily limit:", nil
 	case "/add":
-		return "Add some food"
+		return "Add some food", nil
 	case "/stat":
-		return formatDayReport(u.todayReports())
+		return formatDayReport(u.todayReports()), nil
 	case "/stat7":
-		return formatWeeklyReport(u.weeklyReport())
+		return formatWeeklyReport(u.weeklyReport()), nil
 	}
-	return "I don't understand you\\."
+
+	return "", errors.New("I don't understand you")
 }
 
 // weeklyReport for this user.
