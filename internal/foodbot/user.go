@@ -15,6 +15,8 @@ type User struct {
 	History map[string]uint32 // "2006/01/02" -> kcal consumed
 	Today   Day
 	State   State
+
+	last Report
 }
 
 // State of the communication with the user.
@@ -24,6 +26,9 @@ type State uint8
 const (
 	Default State = iota
 	AskedForLimit
+	AskedForProduct
+	AskedForKcal
+	AskedForGrams
 )
 
 // NewUser creates a new user.
@@ -49,6 +54,38 @@ func (u *User) RespondTo(msg string) (string, error) {
 		return "Limit was saved\\. Thanks\\!", nil
 	}
 
+	if u.State == AskedForProduct {
+		u.last.Product = msg
+		u.State = AskedForKcal
+		return fmt.Sprintf("What is the calorie content of `%q`? Input kcal per 100g:", msg), nil
+	}
+
+	if u.State == AskedForKcal {
+		kcal, err := strconv.ParseUint(msg, 10, 32)
+		if err != nil {
+			return "", fmt.Errorf("%q is not a number. Input kcal per 100g", msg)
+		}
+
+		u.last.Kcal = uint32(kcal)
+		u.State = AskedForGrams
+		return fmt.Sprintf("How many grams of `%q` have you eaten?", u.last.Product), nil
+	}
+
+	if u.State == AskedForGrams {
+		grams, err := strconv.ParseUint(msg, 10, 32)
+		if err != nil {
+			return "", fmt.Errorf("%q is not a number. Input how many grams you've eaten", msg)
+		}
+
+		u.last.Grams = uint32(grams)
+
+		u.State = Default
+		u.Today.Reports = append(u.Today.Reports, u.last)
+		ret := fmt.Sprintf("%v grams of `%q` with %v kcal for 100g was saved\\. Thanks\\!", u.last.Grams, u.last.Product, u.last.Kcal)
+		u.last = Report{}
+		return ret, nil
+	}
+
 	switch msg {
 	case "/start":
 		u.State = AskedForLimit
@@ -57,7 +94,9 @@ func (u *User) RespondTo(msg string) (string, error) {
 		u.State = AskedForLimit
 		return "Input new daily limit:", nil
 	case "/add":
-		return "Add some food", nil
+		u.last.Time = time.Now()
+		u.State = AskedForProduct
+		return "What product do you want to report? Input product's name", nil
 	case "/stat":
 		return formatDayReport(u.todayReports()), nil
 	case "/stat7":
