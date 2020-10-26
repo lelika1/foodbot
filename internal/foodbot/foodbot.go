@@ -24,6 +24,7 @@ func NewDB(path string) *DB {
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
 	defer file.Close()
 	if err != nil {
+		log.Printf("os.OpenFile(%v) failed with %v\n", path, err)
 		return &db
 	}
 

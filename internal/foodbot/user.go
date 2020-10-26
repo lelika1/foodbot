@@ -16,7 +16,8 @@ type User struct {
 	Today   Day
 	State   State
 
-	last Report
+	// For storing incomplete report (during AskedFor{Product,Kcal,Grams} states).
+	inProgress Report
 }
 
 // State of the communication with the user.
@@ -45,29 +46,28 @@ func NewUser(name string, limit uint32) *User {
 func (u *User) RespondTo(msg string) (string, error) {
 	if msg == "/start" {
 		u.State = AskedForLimit
-		return "Hi\\! Input daily limit:", nil
+		return "Hi\\! What's your daily limit \\(kcal\\)?", nil
 	}
 
 	if msg == "/cancel" {
 		return u.handleCancel()
 	}
 
-	if u.State == AskedForLimit {
+	switch u.State {
+	case AskedForLimit:
 		return u.handleLimit(msg)
-	}
-
-	if u.State == AskedForProduct || u.State == AskedForKcal || u.State == AskedForGrams {
+	case AskedForProduct, AskedForKcal, AskedForGrams:
 		return u.handleAdd(msg)
 	}
 
 	switch msg {
 	case "/limit":
 		u.State = AskedForLimit
-		return "Input new daily limit:", nil
+		return "Ok, what's your new daily limit \\(kcal\\)?", nil
 	case "/add":
-		u.last.Time = time.Now()
+		u.inProgress.Time = time.Now()
 		u.State = AskedForProduct
-		return "What product do you want to report? Input product's name", nil
+		return "All right\\! Tell me, what have you eaten?", nil
 	case "/stat":
 		return formatDayReport(u.todayReports()), nil
 	case "/stat7":
@@ -107,57 +107,60 @@ func (u *User) todayReports() []Report {
 }
 
 func (u *User) handleCancel() (string, error) {
-	if u.State == AskedForLimit {
+	switch u.State {
+	case Default:
+		return "Nothing to cancel\\.\\.\\. Maybe /add food or see /stat for today?", nil
+	case AskedForLimit:
 		u.State = Default
-		return fmt.Sprintf("Canceled\\. The current limit is %v\\.", u.Limit), nil
+		return fmt.Sprintf("Ok\\. Your limit is still %v kcal\\.", u.Limit), nil
+	default:
+		u.inProgress = Report{}
+		u.State = Default
+		return "All right, no food has been reported\\.", nil
 	}
-
-	u.last = Report{}
-	u.State = Default
-	return "Canceled\\.", nil
 }
 
 func (u *User) handleLimit(msg string) (string, error) {
 	limit, err := strconv.ParseUint(msg, 10, 32)
 	if err != nil {
-		return "", fmt.Errorf("%q is not a number. Input daily limit", msg)
+		return "", fmt.Errorf("%q is not an integer. Enter your daily limit (kcal)", msg)
 	}
 
 	u.Limit = uint32(limit)
 	u.State = Default
-	return "Limit was saved\\. Thanks\\!", nil
+	return "Limit saved, thanks\\! Now you can /add food or see /stat for today\\.", nil
 }
 
 func (u *User) handleAdd(msg string) (string, error) {
 	switch u.State {
 	case AskedForProduct:
-		u.last.Product = msg
+		u.inProgress.Product = msg
 		u.State = AskedForKcal
-		return fmt.Sprintf("What is the calorie content of `%q`? Input kcal per 100g:", msg), nil
+		return fmt.Sprintf("How many calories \\(kcal per 💯g\\) are there in `%q`?", u.inProgress.Product), nil
 
 	case AskedForKcal:
 		kcal, err := strconv.ParseUint(msg, 10, 32)
 		if err != nil {
-			return "", fmt.Errorf("%q is not a number. Input kcal per 100g", msg)
+			return "", fmt.Errorf("%q is not an integer. Enter kcal per 💯g for %q", msg, u.inProgress.Product)
 		}
 
-		u.last.Kcal = uint32(kcal)
+		u.inProgress.Kcal = uint32(kcal)
 		u.State = AskedForGrams
-		return fmt.Sprintf("How many grams of `%q` have you eaten?", u.last.Product), nil
+		return fmt.Sprintf("How many grams of `%q` have you eaten?", u.inProgress.Product), nil
 
 	case AskedForGrams:
 		grams, err := strconv.ParseUint(msg, 10, 32)
 		if err != nil {
-			return "", fmt.Errorf("%q is not a number. Input how many grams you've eaten", msg)
+			return "", fmt.Errorf("%q is not an integer. Enter how many grams you've eaten", msg)
 		}
 
-		u.last.Grams = uint32(grams)
-		u.Today.Reports = append(u.Today.Reports, u.last)
+		u.inProgress.Grams = uint32(grams)
+		u.Today.Reports = append(u.Today.Reports, u.inProgress)
 
-		ret := fmt.Sprintf("%v grams of `%q` with %v kcal for 100g was saved\\. Thanks\\!",
-			u.last.Grams, u.last.Product, u.last.Kcal)
+		ret := fmt.Sprintf("You ate `%q` \\- %vg with %v kcal per 💯g\\. Bon Appétit🍕",
+			u.inProgress.Product, u.inProgress.Grams, u.inProgress.Kcal)
 
-		u.last = Report{}
+		u.inProgress = Report{}
 		u.State = Default
 		return ret, nil
 	default:
