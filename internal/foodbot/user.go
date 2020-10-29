@@ -167,7 +167,6 @@ func (u *User) handleAdd(msg string) (string, error) {
 
 		u.inProgress.Kcal = uint32(kcal)
 		u.State = AskedForGrams
-		UpdateProduct(u.inProgress.Product, u.inProgress.Kcal)
 		return fmt.Sprintf("How many grams of `%q` have you eaten?", u.inProgress.Product), nil
 
 	case AskedForGrams:
@@ -178,6 +177,7 @@ func (u *User) handleAdd(msg string) (string, error) {
 
 		u.inProgress.Grams = uint32(grams)
 		u.Today.Reports = append(u.Today.Reports, u.inProgress)
+		UpdateProduct(u.inProgress.Product, u.inProgress.Kcal)
 
 		ret := fmt.Sprintf("You ate `%q` \\- %vg with %v kcal per 💯g\\. Bon Appétit🍕",
 			u.inProgress.Product, u.inProgress.Grams, u.inProgress.Kcal)
