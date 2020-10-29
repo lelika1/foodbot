@@ -3,8 +3,10 @@ package foodbot
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -136,9 +138,28 @@ func (u *User) handleAdd(msg string) (string, error) {
 	case AskedForProduct:
 		u.inProgress.Product = msg
 		u.State = AskedForKcal
-		return fmt.Sprintf("How many calories \\(kcal per 💯g\\) are there in `%q`?", u.inProgress.Product), nil
+
+		kcals, ok := GetProductKcals(u.inProgress.Product)
+		if !ok {
+			u.State = AskedForKcal
+			return fmt.Sprintf("How many calories \\(kcal per 💯g\\) are there in `%q`?", u.inProgress.Product), nil
+		}
+
+		var sb strings.Builder
+		fmt.Fprintf(&sb, "Choose a kcal for `%q` from the list:\n", u.inProgress.Product)
+		for _, kcal := range kcals {
+			fmt.Fprintf(&sb, "*/%v kcal*\n", kcal)
+		}
+		fmt.Fprintf(&sb, "\nOr enter new calory amount \\(kcal per 💯g\\)\\.\n")
+
+		return sb.String(), nil
 
 	case AskedForKcal:
+		var kcalReg = regexp.MustCompile(`/[0-9]+`)
+		if kcalReg.MatchString(msg) {
+			msg = msg[1:]
+		}
+
 		kcal, err := strconv.ParseUint(msg, 10, 32)
 		if err != nil {
 			return "", fmt.Errorf("%q is not an integer. Enter kcal per 💯g for %q", msg, u.inProgress.Product)
@@ -146,6 +167,7 @@ func (u *User) handleAdd(msg string) (string, error) {
 
 		u.inProgress.Kcal = uint32(kcal)
 		u.State = AskedForGrams
+		UpdateProduct(u.inProgress.Product, u.inProgress.Kcal)
 		return fmt.Sprintf("How many grams of `%q` have you eaten?", u.inProgress.Product), nil
 
 	case AskedForGrams:

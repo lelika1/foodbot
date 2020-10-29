@@ -19,6 +19,7 @@ type DB struct {
 // NewDB loads DB from the given file, or creates a new one if file doesn't exist.
 func NewDB(path string) *DB {
 	// TODO use normal database
+	LoadProducts("products.db")
 	db := DB{Users: make(map[string]*User)}
 
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
