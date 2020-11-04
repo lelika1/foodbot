@@ -2,7 +2,7 @@ package foodbot
 
 // SQLCreateTables ...
 const SQLCreateTables = `
-    CREATE TABLE IF NOT EXISTS USERS(
+    CREATE TABLE IF NOT EXISTS USER(
 		ID              INTEGER   PRIMARY KEY   AUTOINCREMENT NOT NULL,
 		NAME            TEXT                                  NOT NULL,
 		DAILY_LIMIT           INTEGER   DEFAULT 0                   NOT NULL,
