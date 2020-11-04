@@ -12,6 +12,7 @@ import (
 
 // User of the bot.
 type User struct {
+	ID      int
 	Name    string
 	Limit   uint32
 	History map[string]uint32 // "2006/01/02" -> kcal consumed
@@ -35,8 +36,9 @@ const (
 )
 
 // NewUser creates a new user.
-func NewUser(name string, limit uint32) *User {
+func NewUser(name string, limit uint32, id int) *User {
 	return &User{
+		ID:      id,
 		Name:    name,
 		Limit:   limit,
 		History: make(map[string]uint32),
@@ -67,7 +69,7 @@ func (u *User) RespondTo(msg string) (string, error) {
 		u.State = AskedForLimit
 		return "Ok, what's your new daily limit \\(kcal\\)?", nil
 	case "/add":
-		u.inProgress.Time = time.Now()
+		u.inProgress.When = time.Now()
 		u.State = AskedForProduct
 		return "All right\\! Tell me, what have you eaten?", nil
 	case "/stat":
@@ -104,7 +106,7 @@ func (u *User) weeklyReport() weeklyReport {
 // todayReports returns food eaten by this user today.
 func (u *User) todayReports() []Report {
 	reports := u.Today.Reports
-	sort.Slice(reports, func(i, j int) bool { return reports[i].Time.Before(reports[j].Time) })
+	sort.Slice(reports, func(i, j int) bool { return reports[i].When.Before(reports[j].When) })
 	return reports
 }
 
@@ -139,7 +141,7 @@ func (u *User) handleAdd(msg string) (string, error) {
 		u.inProgress.Product = msg
 		u.State = AskedForKcal
 
-		kcals, ok := GetProductKcals(u.inProgress.Product)
+		kcals, ok := bot.GetProductKcals(u.inProgress.Product)
 		if !ok {
 			u.State = AskedForKcal
 			return fmt.Sprintf("How many calories \\(kcal per 💯g\\) are there in `%q`?", u.inProgress.Product), nil
@@ -177,7 +179,8 @@ func (u *User) handleAdd(msg string) (string, error) {
 
 		u.inProgress.Grams = uint32(grams)
 		u.Today.Reports = append(u.Today.Reports, u.inProgress)
-		UpdateProduct(u.inProgress.Product, u.inProgress.Kcal)
+		bot.db.insertTodayReport(u.ID, u.inProgress)
+		bot.AddProductKcal(u.inProgress.Product, u.inProgress.Kcal)
 
 		ret := fmt.Sprintf("You ate `%q` \\- %vg with %v kcal per 💯g\\. Bon Appétit🍕",
 			u.inProgress.Product, u.inProgress.Grams, u.inProgress.Kcal)

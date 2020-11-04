@@ -1,58 +1,48 @@
 package foodbot
 
 import (
-	"bufio"
-	"errors"
-	"fmt"
-	"log"
-	"os"
-	"strconv"
-	"strings"
 	"time"
 )
 
-// DB stores all the information of the bot.
-type DB struct {
-	Users map[string]*User
+var bot *Bot
+
+// Bot stores all the information and connection to the database.
+type Bot struct {
+	Users    map[int]*User
+	products Products
+
+	db *SQLDb
 }
 
-// NewDB loads DB from the given file, or creates a new one if file doesn't exist.
-func NewDB(path string) *DB {
-	// TODO use normal database
-	LoadProducts("products.db")
-	db := DB{Users: make(map[string]*User)}
+// Products stores information about products as (name: {kcal1: true, kcal2: true}).
+type Products map[string]map[uint32]bool
 
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
-	defer file.Close()
+// NewBot connects to the given DB and loads all stored information for the foodbot.
+func NewBot(dbPath string) (*Bot, error) {
+	db, err := ConnectSQLDb(dbPath)
 	if err != nil {
-		log.Printf("os.OpenFile(%v) failed with %v\n", path, err)
-		return &db
+		return nil, err
 	}
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		userDescr := strings.Split(line, " ")
-		if len(userDescr) != 2 {
-			log.Panic(fmt.Errorf("wrong line in the db: %q", line))
-		}
-
-		limit, err := strconv.ParseUint(userDescr[1], 10, 32)
-		if err != nil {
-			log.Panic(err)
-		}
-
-		db.Users[userDescr[0]] = NewUser(userDescr[0], uint32(limit))
-	}
-	return &db
+	users := db.LoadUsers()
+	products := db.LoadProducts()
+	bot = &Bot{Users: users, products: products, db: db}
+	return bot, nil
 }
 
-// ErrUserNotFound means the bot doesn't have such user.
-var ErrUserNotFound = errors.New("user was not found")
+// Stop ...
+func (bot *Bot) Stop() {
+	bot.db.CloseConnection()
+}
 
-// User finds an user with the given name or returns an ErrUserNotFound if such user doesn't exists.
-func (db *DB) User(name string) (*User, error) {
-	if user, ok := db.Users[name]; ok {
+// User finds an user with the given name.
+// Returns an ErrUserNotFound if such user doesn't exists.
+func (bot *Bot) User(name string) (*User, error) {
+	id, err := bot.db.GetUserByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if user, ok := bot.Users[id]; ok {
 		return user, nil
 	}
 
@@ -61,7 +51,7 @@ func (db *DB) User(name string) (*User, error) {
 
 // Report ...
 type Report struct {
-	Time    time.Time
+	When    time.Time
 	Product string
 	Kcal    uint32 // for 100g
 	Grams   uint32

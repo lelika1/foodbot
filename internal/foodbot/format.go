@@ -44,7 +44,7 @@ func formatDayReport(reports []Report) string {
 		total += kcal
 
 		lines = append(lines, Line{
-			Begin: fmt.Sprintf("%s: %v", r.Time.Format("15:04:05"), r.Product),
+			Begin: fmt.Sprintf("%s: %v", r.When.Format("15:04:05"), r.Product),
 			End:   fmt.Sprintf("%v kcal", kcal),
 		})
 

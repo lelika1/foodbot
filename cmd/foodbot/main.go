@@ -20,7 +20,10 @@ func main() {
 	}
 	bot.Debug = true
 
-	db := foodbot.NewDB(os.Args[2])
+	fbot, err := foodbot.NewBot(os.Args[2])
+	if err != nil {
+		log.Panic(err)
+	}
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
@@ -35,7 +38,7 @@ func main() {
 		}
 
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "I don't understand you")
-		user, err := db.User(update.Message.From.UserName)
+		user, err := fbot.User(update.Message.From.UserName)
 		switch err {
 		case nil:
 			if text, err := user.RespondTo(update.Message.Text); err != nil {
