@@ -3,6 +3,7 @@ package foodbot
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 )
 
 type weeklyReport struct {
@@ -26,7 +27,7 @@ func formatWeeklyReport(report weeklyReport) string {
 	return sb.String()
 }
 
-func formatDayReport(reports []Report) string {
+func formatDayReport(reports []Report, limit uint32) string {
 	if len(reports) == 0 {
 		return "*You ate nothing so far\\.*"
 	}
@@ -48,7 +49,7 @@ func formatDayReport(reports []Report) string {
 			End:   fmt.Sprintf("%v kcal", kcal),
 		})
 
-		if l := len(lines[i].Begin) + len(lines[i].End); maxLen < l {
+		if l := utf8.RuneCountInString(lines[i].Begin) + utf8.RuneCountInString(lines[i].End); maxLen < l {
 			maxLen = l
 		}
 	}
@@ -56,10 +57,11 @@ func formatDayReport(reports []Report) string {
 	var sb strings.Builder
 	sb.WriteString("*You ate today:*\n")
 	for _, line := range lines {
-		spaces := maxLen - (len(line.Begin) + len(line.End)) + 1
+		spaces := maxLen - (utf8.RuneCountInString(line.Begin) + utf8.RuneCountInString(line.End)) + 1
 		fmt.Fprintf(&sb, "`%s%s`*%s*\n", line.Begin, strings.Repeat(" ", spaces), line.End)
 	}
-	fmt.Fprintf(&sb, "\n`Total:` *%v kcal*\n", total)
+	fmt.Fprintf(&sb, "\n`Total:   ` *%v kcal*", total)
+	fmt.Fprintf(&sb, "\n`Leftover:` *%v kcal*\n", limit-total)
 	return sb.String()
 }
 

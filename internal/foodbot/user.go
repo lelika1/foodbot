@@ -73,7 +73,7 @@ func (u *User) RespondTo(msg string) (string, error) {
 		u.State = AskedForProduct
 		return "All right\\! Tell me, what have you eaten?", nil
 	case "/stat":
-		return formatDayReport(u.todayReports()), nil
+		return formatDayReport(u.todayReports(), u.Limit), nil
 	case "/stat7":
 		return formatWeeklyReport(u.weeklyReport()), nil
 	}
@@ -148,11 +148,11 @@ func (u *User) handleAdd(msg string) (string, error) {
 		}
 
 		var sb strings.Builder
-		fmt.Fprintf(&sb, "Choose a kcal for `%q` from the list:\n", u.inProgress.Product)
+		fmt.Fprintf(&sb, "Choose kcal for `%q` from the list:\n", u.inProgress.Product)
 		for _, kcal := range kcals {
 			fmt.Fprintf(&sb, "*/%v kcal*\n", kcal)
 		}
-		fmt.Fprintf(&sb, "\nOr enter new calory amount \\(kcal per 💯g\\)\\.\n")
+		fmt.Fprintf(&sb, "\nOr enter new calorie amount \\(kcal per 💯g\\)\\.\n")
 
 		return sb.String(), nil
 
