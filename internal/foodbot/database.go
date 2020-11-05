@@ -89,6 +89,35 @@ func (sdb *SQLDb) LoadProducts() Products {
 	return products
 }
 
+// GetTodayReports ...
+func (sdb *SQLDb) GetTodayReports(uid int) []Report {
+	var ret []Report
+	rows, err := sdb.db.Query("SELECT TIME, PRODUCT, KCAL, GRAMS FROM TODAY where user_id=?;", uid)
+	if err != nil {
+		return ret
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			date, product string
+			kcal, grams   uint32
+		)
+		if err = rows.Scan(&date, &product, &kcal, &grams); err == nil {
+			when, _ := time.Parse("Jan 2 15:04:05 2006", date)
+			if when.Format("Jan 2 2006") == time.Now().Format("Jan 2 2006") {
+				ret = append(ret, Report{
+					When:    when,
+					Product: product,
+					Kcal:    kcal,
+					Grams:   grams,
+				})
+			}
+		}
+	}
+	return ret
+}
+
 func (sdb *SQLDb) selectUsers() map[int]*User {
 	users := make(map[int]*User)
 

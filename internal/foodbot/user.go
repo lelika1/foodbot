@@ -105,7 +105,7 @@ func (u *User) weeklyReport() weeklyReport {
 
 // todayReports returns food eaten by this user today.
 func (u *User) todayReports() []Report {
-	reports := u.Today.Reports
+	reports := bot.db.GetTodayReports(u.ID)
 	sort.Slice(reports, func(i, j int) bool { return reports[i].When.Before(reports[j].When) })
 	return reports
 }
