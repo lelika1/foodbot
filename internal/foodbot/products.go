@@ -2,10 +2,12 @@ package foodbot
 
 import (
 	"sort"
+	"strings"
 )
 
 // AddProductKcal adds a new energy value for the given product.
-func (b *Bot) AddProductKcal(food string, kcal uint32) {
+func (b *Bot) AddProductKcal(name string, kcal uint32) {
+	food := strings.ToLower(name)
 	if _, ok := b.products[food]; !ok {
 		b.products[food] = make(map[uint32]bool)
 	}
@@ -15,7 +17,8 @@ func (b *Bot) AddProductKcal(food string, kcal uint32) {
 
 // GetProductKcals returns a list of possible energy values for the given product.
 // Returns false if such product has not been added before.
-func (b *Bot) GetProductKcals(food string) ([]uint32, bool) {
+func (b *Bot) GetProductKcals(name string) ([]uint32, bool) {
+	food := strings.ToLower(name)
 	if _, ok := b.products[food]; !ok {
 		return nil, false
 	}

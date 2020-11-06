@@ -23,7 +23,7 @@ const SQLCreateTables = `
 	);`
 
 //SQLInsertProduct ...
-const SQLInsertProduct = `"INSERT INTO PRODUCT(name, kcal) values(?,?)"`
+const SQLInsertProduct = `INSERT INTO PRODUCT(name, kcal) values(?, ?);`
 
 // SQLInsertTodayReport ...
 const SQLInsertTodayReport = `INSERT INTO TODAY(user_id, time, product, kcal, grams) values(?, ?, ?, ?, ?);`

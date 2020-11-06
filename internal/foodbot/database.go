@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver that supports database/sql.
@@ -82,7 +83,7 @@ func (sdb *SQLDb) LoadUsers() map[int]*User {
 // LoadProducts saved in the bot.
 func (sdb *SQLDb) LoadProducts() Products {
 	products := make(map[string]map[uint32]bool)
-	rows, err := sdb.db.Query("SELECT * FROM PRODUCT;")
+	rows, err := sdb.db.Query("SELECT LOWER(NAME), KCAL FROM PRODUCT;")
 	if err != nil {
 		log.Println(err)
 		return products
@@ -111,7 +112,7 @@ func (sdb *SQLDb) GetHistoryForDates(uid int, dates []string) map[string][]Repor
 		history[d] = nil
 	}
 
-	rows, err := sdb.db.Query("SELECT TIME, PRODUCT, KCAL, GRAMS FROM TODAY where user_id=?;", uid)
+	rows, err := sdb.db.Query("SELECT TIME, LOWER(PRODUCT), KCAL, GRAMS FROM TODAY where user_id=?;", uid)
 	if err != nil {
 		return history
 	}
@@ -141,12 +142,12 @@ func (sdb *SQLDb) GetHistoryForDates(uid int, dates []string) map[string][]Repor
 
 func (sdb *SQLDb) insertProduct(food string, kcal uint32) {
 	if stmt, err := sdb.db.Prepare(SQLInsertProduct); err == nil {
-		_, err := stmt.Exec(food, kcal)
+		_, err := stmt.Exec(strings.ToLower(food), kcal)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Exec failed with: %q", err)
 		}
 	} else {
-		log.Println(err)
+		log.Printf("Prepare failed with: %q", err)
 	}
 }
 
@@ -154,9 +155,9 @@ func (sdb *SQLDb) insertReport(uid int, r Report) {
 	if stmt, err := sdb.db.Prepare(SQLInsertTodayReport); err == nil {
 		_, err := stmt.Exec(uid, r.When.Format("Jan 2 15:04:05 2006"), r.Product, r.Kcal, r.Grams)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Exec failed with: %q", err)
 		}
 	} else {
-		log.Println(err)
+		log.Printf("Prepare failed with: %q", err)
 	}
 }
