@@ -6,28 +6,27 @@ import (
 	"unicode/utf8"
 )
 
-type weeklyReport struct {
-	Today        uint32
-	TodayInLimit bool
-	History      []shortDayReport
-}
-
-type shortDayReport struct {
+type dayResult struct {
 	Date    string
 	Kcal    uint32
 	InLimit bool
 }
 
-func formatWeeklyReport(report weeklyReport) string {
+// 0 element - Today, 1 - yestrday, ...
+func formatStat7(week []dayResult) string {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "`%s Today:         ` *%v kcal*\n", color(report.TodayInLimit), report.Today)
-	for _, r := range report.History {
+	for d, r := range week {
+		if d == 0 {
+			fmt.Fprintf(&sb, "`%s Today:         ` *%v kcal*\n", color(r.InLimit), r.Kcal)
+			continue
+		}
 		fmt.Fprintf(&sb, "`%s %v:` *%v kcal*\n", color(r.InLimit), r.Date, r.Kcal)
+
 	}
 	return sb.String()
 }
 
-func formatDayReport(reports []Report, limit uint32) string {
+func formatStat(reports []Report, limit uint32) string {
 	if len(reports) == 0 {
 		return "*You ate nothing so far\\.*"
 	}

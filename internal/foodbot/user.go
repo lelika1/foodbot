@@ -12,12 +12,10 @@ import (
 
 // User of the bot.
 type User struct {
-	ID      int
-	Name    string
-	Limit   uint32
-	History map[string]uint32 // "2006/01/02" -> kcal consumed
-	Today   Day
-	State   State
+	ID    int
+	Name  string
+	Limit uint32
+	State State
 
 	// For storing incomplete report (during AskedFor{Product,Kcal,Grams} states).
 	inProgress Report
@@ -38,11 +36,10 @@ const (
 // NewUser creates a new user.
 func NewUser(name string, limit uint32, id int) *User {
 	return &User{
-		ID:      id,
-		Name:    name,
-		Limit:   limit,
-		History: make(map[string]uint32),
-		State:   Default,
+		ID:    id,
+		Name:  name,
+		Limit: limit,
+		State: Default,
 	}
 }
 
@@ -73,39 +70,42 @@ func (u *User) RespondTo(msg string) (string, error) {
 		u.State = AskedForProduct
 		return "All right\\! Tell me, what have you eaten?", nil
 	case "/stat":
-		return formatDayReport(u.todayReports(), u.Limit), nil
+		return formatStat(u.todayReports(), u.Limit), nil
 	case "/stat7":
-		return formatWeeklyReport(u.weeklyReport()), nil
+		return formatStat7(u.weeklyStat()), nil
 	}
 
 	return "", errors.New("I don't understand you")
 }
 
-// weeklyReport for this user.
-func (u *User) weeklyReport() weeklyReport {
+// weeklyStat for this user.
+func (u *User) weeklyStat() []dayResult {
+	var week []string
 	now := time.Now()
-	var history []shortDayReport
-	for delta := 1; delta <= 6; delta++ {
+	for delta := 0; delta <= 6; delta++ {
+		week = append(week, now.AddDate(0, 0, -delta).Format("Mon 2006/01/02"))
+	}
+
+	weekReports := bot.db.GetHistoryForDates(u.ID, week)
+
+	var ret []dayResult
+	for delta := 0; delta <= 6; delta++ {
 		key := now.AddDate(0, 0, -delta).Format("Mon 2006/01/02")
-		kcal := u.History[key]
-		history = append(history, shortDayReport{
+		total := TotalKcal(weekReports[key])
+		ret = append(ret, dayResult{
 			Date:    key,
-			Kcal:    kcal,
-			InLimit: kcal < u.Limit,
+			Kcal:    total,
+			InLimit: total < u.Limit,
 		})
 	}
 
-	total := u.Today.TotalKcal()
-	return weeklyReport{
-		Today:        total,
-		TodayInLimit: total < u.Limit,
-		History:      history,
-	}
+	return ret
 }
 
 // todayReports returns food eaten by this user today.
 func (u *User) todayReports() []Report {
-	reports := bot.db.GetTodayReports(u.ID)
+	today := time.Now().Format("Mon 2006/01/02")
+	reports := bot.db.GetHistoryForDates(u.ID, []string{today})[today]
 	sort.Slice(reports, func(i, j int) bool { return reports[i].When.Before(reports[j].When) })
 	return reports
 }
@@ -178,8 +178,7 @@ func (u *User) handleAdd(msg string) (string, error) {
 		}
 
 		u.inProgress.Grams = uint32(grams)
-		u.Today.Reports = append(u.Today.Reports, u.inProgress)
-		bot.db.insertTodayReport(u.ID, u.inProgress)
+		bot.db.insertReport(u.ID, u.inProgress)
 		bot.AddProductKcal(u.inProgress.Product, u.inProgress.Kcal)
 
 		ret := fmt.Sprintf("You ate `%q` \\- %vg with %v kcal per 💯g\\. Bon Appétit🍕",

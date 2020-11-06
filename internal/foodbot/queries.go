@@ -13,13 +13,6 @@ const SQLCreateTables = `
         KCAL            INTEGER   DEFAULT 0                   NOT NULL,
         UNIQUE (NAME, KCAL)
 	);
-	CREATE TABLE IF NOT EXISTS HISTORY(
-		USER_ID         INTEGER                               NOT NULL,
-		DATE            TEXT                                  NOT NULL,
-        KCAL            INTEGER                               NOT NULL,
-        DAILY_LIMIT		INTEGER                               NOT NULL,
-        FOREIGN KEY(USER_ID) REFERENCES USER(ID) ON DELETE CASCADE
-	);
 	CREATE TABLE IF NOT EXISTS TODAY(
 		USER_ID         INTEGER                               NOT NULL,
 		TIME            TEXT                                  NOT NULL,

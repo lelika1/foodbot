@@ -29,7 +29,7 @@ func NewBot(dbPath string) (*Bot, error) {
 	return bot, nil
 }
 
-// Stop ...
+// Stop connection to the database.
 func (bot *Bot) Stop() {
 	bot.db.CloseConnection()
 }
@@ -37,7 +37,7 @@ func (bot *Bot) Stop() {
 // User finds an user with the given name.
 // Returns an ErrUserNotFound if such user doesn't exists.
 func (bot *Bot) User(name string) (*User, error) {
-	id, err := bot.db.GetUserByName(name)
+	id, err := bot.db.FindUserID(name)
 	if err != nil {
 		return nil, err
 	}
@@ -57,16 +57,11 @@ type Report struct {
 	Grams   uint32
 }
 
-// Day ...
-type Day struct {
-	Reports []Report
-}
-
-// TotalKcal ...
-func (d *Day) TotalKcal() uint32 {
+// TotalKcal calculates energy of all eaten food.
+func TotalKcal(reports []Report) uint32 {
 	var ret uint32
-	for _, r := range d.Reports {
-		ret += r.Kcal * r.Grams / 100
+	for _, r := range reports {
+		ret += r.Kcal * r.Grams
 	}
-	return ret
+	return ret / 100
 }
