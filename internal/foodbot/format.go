@@ -54,13 +54,18 @@ func formatStat(reports []Report, limit uint32) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("*You ate today:*\n")
+	fmt.Fprintf(&sb, "You ate today *%v kcal*:\n", total)
 	for _, line := range lines {
 		spaces := maxLen - (utf8.RuneCountInString(line.Begin) + utf8.RuneCountInString(line.End)) + 1
 		fmt.Fprintf(&sb, "`%s%s`*%s*\n", line.Begin, strings.Repeat(" ", spaces), line.End)
 	}
-	fmt.Fprintf(&sb, "\n`Total:   ` *%v kcal*", total)
-	fmt.Fprintf(&sb, "\n`Leftover:` *%v kcal*\n", limit-total)
+
+	if total < limit {
+		fmt.Fprintf(&sb, "\n✅ Still *%v kcal* left\\.\n", limit-total)
+	} else {
+		fmt.Fprintf(&sb, "\n❌ You ate *%v kcal* over the limit\\.\n", total-limit)
+	}
+
 	return sb.String()
 }
 
