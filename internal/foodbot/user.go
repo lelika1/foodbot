@@ -72,7 +72,7 @@ func (u *User) RespondTo(msg string) (string, error) {
 	case "/stat":
 		return formatStat(u.todayReports(), u.Limit), nil
 	case "/stat7":
-		return formatStat7(u.weeklyStat()), nil
+		return formatStat7(u.weeklyStat(), u.Limit), nil
 	}
 
 	return "", errors.New("I don't understand you")
@@ -86,7 +86,7 @@ func (u *User) weeklyStat() []dayResult {
 		week = append(week, now.AddDate(0, 0, -delta).Format("Mon 2006/01/02"))
 	}
 
-	weekReports := bot.db.GetHistoryForDates(u.ID, week)
+	weekReports := bot.db.GetHistoryForDates(u.ID, week...)
 
 	var ret []dayResult
 	for delta := 0; delta <= 6; delta++ {
@@ -105,7 +105,7 @@ func (u *User) weeklyStat() []dayResult {
 // todayReports returns food eaten by this user today.
 func (u *User) todayReports() []Report {
 	today := time.Now().Format("Mon 2006/01/02")
-	reports := bot.db.GetHistoryForDates(u.ID, []string{today})[today]
+	reports := bot.db.GetHistoryForDates(u.ID, today)[today]
 	sort.Slice(reports, func(i, j int) bool { return reports[i].When.Before(reports[j].When) })
 	return reports
 }
@@ -181,8 +181,14 @@ func (u *User) handleAdd(msg string) (string, error) {
 		bot.db.insertReport(u.ID, u.inProgress)
 		bot.AddProductKcal(u.inProgress.Product, u.inProgress.Kcal)
 
-		ret := fmt.Sprintf("You ate `%q` \\- %vg with %v kcal per 💯g\\. Bon Appétit🍕",
-			u.inProgress.Product, u.inProgress.Grams, u.inProgress.Kcal)
+		today := time.Now().Format("Mon 2006/01/02")
+		total := TotalKcal(bot.db.GetHistoryForDates(u.ID, today)[today])
+		var ret string
+		if total < u.Limit {
+			ret = fmt.Sprintf("Noted\\. *%v kcal* left for today 😋\nLet's /add more food\\.", u.Limit-total)
+		} else {
+			ret = fmt.Sprintf("Noted\\. You ate *%v kcal* over the limit 😱\nYou can see /stat7 for the last week\\.", total-u.Limit)
+		}
 
 		u.inProgress = Report{}
 		u.State = Default

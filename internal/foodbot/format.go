@@ -13,8 +13,9 @@ type dayResult struct {
 }
 
 // 0 element - Today, 1 - yestrday, ...
-func formatStat7(week []dayResult) string {
+func formatStat7(week []dayResult, limit uint32) string {
 	var sb strings.Builder
+	fmt.Fprintf(&sb, "You daily limit is *%v kcal*\n", limit)
 	for d, r := range week {
 		if d == 0 {
 			fmt.Fprintf(&sb, "`%s Today:         ` *%v kcal*\n", color(r.InLimit), r.Kcal)

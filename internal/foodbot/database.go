@@ -107,7 +107,7 @@ func (sdb *SQLDb) LoadProducts() Products {
 }
 
 // GetHistoryForDates as a map "Mon 2006/01/02" -> list of eated food.
-func (sdb *SQLDb) GetHistoryForDates(uid int, dates []string) map[string][]Report {
+func (sdb *SQLDb) GetHistoryForDates(uid int, dates ...string) map[string][]Report {
 	if len(dates) == 0 {
 		return nil
 	}
