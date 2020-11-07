@@ -63,6 +63,7 @@ func (sdb *SQLDb) LoadUsers() map[int]*User {
 
 	rows, err := sdb.db.Query("SELECT * FROM USER;")
 	if err != nil {
+		log.Printf("'SELECT * FROM USER;' failed with: %q", err)
 		return users
 	}
 	defer rows.Close()
@@ -85,7 +86,7 @@ func (sdb *SQLDb) LoadProducts() Products {
 	products := make(map[string]map[uint32]bool)
 	rows, err := sdb.db.Query("SELECT LOWER(NAME), KCAL FROM PRODUCT;")
 	if err != nil {
-		log.Println(err)
+		log.Printf("'SELECT LOWER(NAME), KCAL FROM PRODUCT;' failed with: %q", err)
 		return products
 	}
 	defer rows.Close()
@@ -107,34 +108,46 @@ func (sdb *SQLDb) LoadProducts() Products {
 
 // GetHistoryForDates as a map "Mon 2006/01/02" -> list of eated food.
 func (sdb *SQLDb) GetHistoryForDates(uid int, dates []string) map[string][]Report {
+	if len(dates) == 0 {
+		return nil
+	}
+
 	history := make(map[string][]Report)
 	for _, d := range dates {
 		history[d] = nil
 	}
 
-	rows, err := sdb.db.Query("SELECT TIME, LOWER(PRODUCT), KCAL, GRAMS FROM TODAY where user_id=?;", uid)
+	var sb strings.Builder
+	sb.WriteString("SELECT DATE, TIME, LOWER(PRODUCT), KCAL, GRAMS FROM REPORTS WHERE USER_ID=? AND DATE IN(?")
+	sb.WriteString(strings.Repeat(",?", len(dates)-1))
+	sb.WriteString(");")
+
+	args := []interface{}{uid}
+	for _, date := range dates {
+		args = append(args, date)
+	}
+
+	rows, err := sdb.db.Query(sb.String(), args...)
 	if err != nil {
+		log.Printf("%q failed with: %q", sb.String(), err)
 		return history
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var (
-			date, product string
-			kcal, grams   uint32
+			date, hours, product string
+			kcal, grams          uint32
 		)
 
-		if err = rows.Scan(&date, &product, &kcal, &grams); err == nil {
-			when, _ := time.Parse("Jan 2 15:04:05 2006", date)
-			date := when.Format("Mon 2006/01/02")
-			if _, ok := history[date]; ok {
-				history[date] = append(history[date], Report{
-					When:    when,
-					Product: product,
-					Kcal:    kcal,
-					Grams:   grams,
-				})
-			}
+		if err = rows.Scan(&date, &hours, &product, &kcal, &grams); err == nil {
+			when, _ := time.Parse("Mon 2006/01/02 15:04:05", date+" "+hours)
+			history[date] = append(history[date], Report{
+				When:    when,
+				Product: product,
+				Kcal:    kcal,
+				Grams:   grams,
+			})
 		}
 	}
 	return history
@@ -153,7 +166,9 @@ func (sdb *SQLDb) insertProduct(food string, kcal uint32) {
 
 func (sdb *SQLDb) insertReport(uid int, r Report) {
 	if stmt, err := sdb.db.Prepare(SQLInsertTodayReport); err == nil {
-		_, err := stmt.Exec(uid, r.When.Format("Jan 2 15:04:05 2006"), r.Product, r.Kcal, r.Grams)
+		date := r.When.Format("Mon 2006/01/02")
+		time := r.When.Format("15:04:05")
+		_, err := stmt.Exec(uid, date, time, r.Product, r.Kcal, r.Grams)
 		if err != nil {
 			log.Printf("Exec failed with: %q", err)
 		}

@@ -11,8 +11,10 @@ func (b *Bot) AddProductKcal(name string, kcal uint32) {
 	if _, ok := b.products[food]; !ok {
 		b.products[food] = make(map[uint32]bool)
 	}
-	b.products[food][kcal] = true
-	b.db.insertProduct(food, kcal)
+	if _, ok := b.products[food][kcal]; !ok {
+		b.db.insertProduct(food, kcal)
+		b.products[food][kcal] = true
+	}
 }
 
 // GetProductKcals returns a list of possible energy values for the given product.

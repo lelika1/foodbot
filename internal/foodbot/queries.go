@@ -13,8 +13,9 @@ const SQLCreateTables = `
         KCAL            INTEGER   DEFAULT 0                   NOT NULL,
         UNIQUE (NAME, KCAL)
 	);
-	CREATE TABLE IF NOT EXISTS TODAY(
+	CREATE TABLE IF NOT EXISTS REPORTS(
 		USER_ID         INTEGER                               NOT NULL,
+		DATE            TEXT                                  NOT NULL,
 		TIME            TEXT                                  NOT NULL,
 		PRODUCT         TEXT                                  NOT NULL,
         KCAL            INTEGER                               NOT NULL,
@@ -26,4 +27,4 @@ const SQLCreateTables = `
 const SQLInsertProduct = `INSERT INTO PRODUCT(name, kcal) values(?, ?);`
 
 // SQLInsertTodayReport ...
-const SQLInsertTodayReport = `INSERT INTO TODAY(user_id, time, product, kcal, grams) values(?, ?, ?, ?, ?);`
+const SQLInsertTodayReport = `INSERT INTO REPORTS(user_id, date, time, product, kcal, grams) values(?, ?, ?, ?, ?, ?);`
