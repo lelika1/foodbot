@@ -38,21 +38,16 @@ func main() {
 		}
 
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "I don't understand you")
-		user, err := fbot.User(update.Message.From.UserName)
-		switch err {
+		switch text, err := fbot.RespondTo(update.Message.From.UserName, update.Message.Text); err {
 		case nil:
-			if text, err := user.RespondTo(update.Message.Text); err != nil {
-				msg.Text = err.Error()
-				msg.ReplyToMessageID = update.Message.MessageID
-			} else {
-				msg.Text = text
-				msg.ParseMode = "MarkdownV2"
-			}
-
+			msg.Text = text
+			msg.ParseMode = "MarkdownV2"
 		case foodbot.ErrUserNotFound:
 			msg.Text = "You aren't a user of this bot."
+			msg.ReplyToMessageID = update.Message.MessageID
 		default:
 			msg.Text = err.Error()
+			msg.ReplyToMessageID = update.Message.MessageID
 		}
 
 		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)

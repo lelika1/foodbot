@@ -6,8 +6,6 @@ import (
 	"github.com/lelika1/foodbot/internal/sqlite"
 )
 
-var bot *Bot
-
 // Bot stores all the information and connection to the database.
 type Bot struct {
 	*sqlite.DB
@@ -23,12 +21,11 @@ func NewBot(dbPath string) (*Bot, error) {
 		return nil, err
 	}
 
-	bot = &Bot{
+	return &Bot{
 		users:    createUsers(db.Users()),
 		products: createProducts(db.Products()),
 		DB:       db,
-	}
-	return bot, nil
+	}, nil
 }
 
 // Stop connection to the database.

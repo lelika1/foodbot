@@ -42,21 +42,26 @@ func createUsers(users []sqlite.User) map[string]*User {
 }
 
 // RespondTo the given message from the user.
-func (u *User) RespondTo(msg string) (string, error) {
+func (b *Bot) RespondTo(name string, msg string) (string, error) {
+	u, err := b.User(name)
+	if err != nil {
+		return "", err
+	}
+
 	if msg == "/start" {
 		u.state = AskedForLimit
 		return "Hi\\! What's your daily limit \\(kcal\\)?", nil
 	}
 
 	if msg == "/cancel" {
-		return u.handleCancel()
+		return b.handleCancel(u)
 	}
 
 	switch u.state {
 	case AskedForLimit:
-		return u.handleLimit(msg)
+		return b.handleLimit(u, msg)
 	case AskedForProduct, AskedForKcal, AskedForGrams:
-		return u.handleAdd(msg)
+		return b.handleAdd(u, msg)
 	}
 
 	switch msg {
@@ -68,23 +73,23 @@ func (u *User) RespondTo(msg string) (string, error) {
 		u.state = AskedForProduct
 		return "All right\\! Tell me, what have you eaten?", nil
 	case "/stat":
-		return formatStat(u.todayReports(), u.Limit), nil
+		return formatStat(b.todayReports(u), u.Limit), nil
 	case "/stat7":
-		return formatStat7(u.weeklyStat(), u.Limit), nil
+		return formatStat7(b.weeklyStat(u), u.Limit), nil
 	}
 
 	return "", errors.New("I don't understand you")
 }
 
 // weeklyStat for this user.
-func (u *User) weeklyStat() []dayResult {
+func (b *Bot) weeklyStat(u *User) []dayResult {
 	var week []string
 	now := time.Now()
 	for delta := 0; delta <= 6; delta++ {
 		week = append(week, now.AddDate(0, 0, -delta).Format("Mon 2006/01/02"))
 	}
 
-	history := bot.History(u.ID, week...)
+	history := b.History(u.ID, week...)
 	var ret []dayResult
 	for _, day := range week {
 		total := history[day]
@@ -98,13 +103,13 @@ func (u *User) weeklyStat() []dayResult {
 }
 
 // todayReports returns food eaten by this user today.
-func (u *User) todayReports() []sqlite.Report {
-	reports := bot.TodayReports(u.ID)
+func (b *Bot) todayReports(u *User) []sqlite.Report {
+	reports := b.TodayReports(u.ID)
 	sort.Slice(reports, func(i, j int) bool { return reports[i].When.Before(reports[j].When) })
 	return reports
 }
 
-func (u *User) handleCancel() (string, error) {
+func (b *Bot) handleCancel(u *User) (string, error) {
 	switch u.state {
 	case Default:
 		return "Nothing to cancel\\.\\.\\. Maybe /add food or see /stat for today?", nil
@@ -118,7 +123,7 @@ func (u *User) handleCancel() (string, error) {
 	}
 }
 
-func (u *User) handleLimit(msg string) (string, error) {
+func (b *Bot) handleLimit(u *User, msg string) (string, error) {
 	limit, err := strconv.ParseUint(msg, 10, 32)
 	if err != nil {
 		return "", fmt.Errorf("%q is not an integer. Enter your daily limit (kcal)", msg)
@@ -129,13 +134,13 @@ func (u *User) handleLimit(msg string) (string, error) {
 	return "Limit saved, thanks\\! Now you can /add food or see /stat for today\\.", nil
 }
 
-func (u *User) handleAdd(msg string) (string, error) {
+func (b *Bot) handleAdd(u *User, msg string) (string, error) {
 	switch u.state {
 	case AskedForProduct:
 		u.inProgress.Product = msg
 		u.state = AskedForKcal
 
-		kcals, ok := bot.GetProductKcals(u.inProgress.Product)
+		kcals, ok := b.GetProductKcals(u.inProgress.Product)
 		if !ok {
 			u.state = AskedForKcal
 			return fmt.Sprintf("How many calories \\(kcal per 💯g\\) are there in `%q`?", u.inProgress.Product), nil
@@ -172,10 +177,10 @@ func (u *User) handleAdd(msg string) (string, error) {
 		}
 
 		u.inProgress.Grams = uint32(grams)
-		bot.SaveReport(u.ID, u.inProgress)
-		bot.AddProductKcal(u.inProgress.Product, u.inProgress.Kcal)
+		b.SaveReport(u.ID, u.inProgress)
+		b.AddProductKcal(u.inProgress.Product, u.inProgress.Kcal)
 
-		total := TotalKcal(bot.TodayReports(u.ID))
+		total := TotalKcal(b.TodayReports(u.ID))
 		var ret string
 		if total < u.Limit {
 			ret = fmt.Sprintf("Noted\\. *%v kcal* left for today 😋\nLet's /add more food\\.", u.Limit-total)
