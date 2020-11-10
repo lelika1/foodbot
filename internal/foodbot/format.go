@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/lelika1/foodbot/internal/sqlite"
 )
 
 type dayResult struct {
@@ -27,7 +29,7 @@ func formatStat7(week []dayResult, limit uint32) string {
 	return sb.String()
 }
 
-func formatStat(reports []Report, limit uint32) string {
+func formatStat(reports []sqlite.Report, limit uint32) string {
 	if len(reports) == 0 {
 		return "*You ate nothing so far\\.*"
 	}

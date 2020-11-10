@@ -1,7 +1,8 @@
-package foodbot
+package sqlite
 
-// SQLCreateTables ...
-const SQLCreateTables = `
+import "strings"
+
+const createTablesQuery = `
     CREATE TABLE IF NOT EXISTS USER(
 		ID              INTEGER   PRIMARY KEY   AUTOINCREMENT NOT NULL,
 		NAME            TEXT                                  NOT NULL,
@@ -23,8 +24,25 @@ const SQLCreateTables = `
 		FOREIGN KEY(USER_ID) REFERENCES USER(ID) ON DELETE CASCADE
 	);`
 
-//SQLInsertProduct ...
-const SQLInsertProduct = `INSERT INTO PRODUCT(name, kcal) values(?, ?);`
+const insertProductQuery = `INSERT INTO PRODUCT(name, kcal) values(?, ?);`
 
-// SQLInsertTodayReport ...
-const SQLInsertTodayReport = `INSERT INTO REPORTS(user_id, date, time, product, kcal, grams) values(?, ?, ?, ?, ?, ?);`
+const insertReportQuery = `INSERT INTO REPORTS(user_id, date, time, product, kcal, grams) values(?, ?, ?, ?, ?, ?);`
+
+const selectTodayQuery = "SELECT DATE, TIME, LOWER(PRODUCT), KCAL, GRAMS FROM REPORTS WHERE USER_ID=? AND DATE=?;"
+
+func selectReportsQuery(uid int, dates ...string) (string, []interface{}) {
+	if len(dates) == 0 {
+		return "SELECT DATE, SUM(KCAL * GRAMS)/100 FROM REPORTS WHERE DATE IN() GROUP BY DATE;", []interface{}{uid}
+	}
+
+	var sb strings.Builder
+	sb.WriteString("SELECT DATE, SUM(KCAL * GRAMS)/100  FROM REPORTS WHERE DATE IN(?")
+	sb.WriteString(strings.Repeat(",?", len(dates)-1))
+	sb.WriteString(") GROUP BY DATE;")
+
+	args := []interface{}{uid}
+	for _, date := range dates {
+		args = append(args, date)
+	}
+	return sb.String(), args
+}
