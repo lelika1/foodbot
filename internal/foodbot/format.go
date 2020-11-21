@@ -47,7 +47,7 @@ func formatStat(reports []sqlite.Report, limit uint32) string {
 		total += kcal
 
 		lines = append(lines, Line{
-			Begin: fmt.Sprintf("%s: %v", r.When.Format("15:04:05"), r.Product),
+			Begin: fmt.Sprintf("%s: %v", r.When.Format("15:04:05"), r.Name),
 			End:   fmt.Sprintf("%v kcal", kcal),
 		})
 

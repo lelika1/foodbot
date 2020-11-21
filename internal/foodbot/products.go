@@ -1,50 +1,99 @@
 package foodbot
 
 import (
+	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/lelika1/foodbot/internal/sqlite"
 )
 
-// Products stores information about products as (name: {kcal1: true, kcal2: true}).
-type Products map[string]map[uint32]bool
+// Product is alias for sqlite.Product.
+type Product sqlite.Product
 
-func createProducts(products []sqlite.Product) Products {
-	ret := make(Products)
-	for _, p := range products {
-		if _, ok := ret[p.Name]; !ok {
-			ret[p.Name] = make(map[uint32]bool)
+func (p *Product) String() string {
+	return fmt.Sprintf("%v %v kcal", p.Name, p.Kcal)
+}
+
+// products stores information as (product's name: {kcal1: true, kcal2: true}).
+// Also stores cache of last added products.
+type products struct {
+	all       map[string]map[uint32]bool
+	cache     []string
+	cacheSize int
+}
+
+func newProducts(list []sqlite.Product) products {
+	all := make(map[string]map[uint32]bool)
+	for _, p := range list {
+		if _, ok := all[p.Name]; !ok {
+			all[p.Name] = make(map[uint32]bool)
 		}
-		ret[p.Name][p.Kcal] = true
+		all[p.Name][p.Kcal] = true
+	}
+	return products{all: all, cacheSize: 5}
+}
+
+func (p *products) lastAdded() []Product {
+	var ret []Product = make([]Product, len(p.cache))
+	for i, cached := range p.cache {
+		json.Unmarshal([]byte(cached), &ret[i])
 	}
 	return ret
 }
 
-// AddProductKcal adds a new energy value for the given product.
-func (b *Bot) AddProductKcal(name string, kcal uint32) {
-	food := strings.ToLower(name)
-	if _, ok := b.products[food]; !ok {
-		b.products[food] = make(map[uint32]bool)
+func (p *products) similar(name string) []Product {
+	pattern := normalize(name)
+	if _, ok := p.all[pattern]; !ok {
+		return nil
 	}
-	if _, ok := b.products[food][kcal]; !ok {
-		b.SaveProduct(food, kcal)
-		b.products[food][kcal] = true
+
+	var ret []Product
+	for k := range p.all[pattern] {
+		ret = append(ret, Product{pattern, k})
 	}
+	sort.Slice(ret, func(i, j int) bool { return ret[i].Kcal < ret[j].Kcal })
+	return ret
 }
 
-// GetProductKcals returns a list of possible energy values for the given product.
-// Returns false if such product has not been added before.
-func (b *Bot) GetProductKcals(name string) ([]uint32, bool) {
-	food := strings.ToLower(name)
-	if _, ok := b.products[food]; !ok {
-		return nil, false
+// returns true if (name, kcal) was new, and false otherwise.
+func (p *products) addProduct(name string, kcal uint32) bool {
+	food := normalize(name)
+	if p.updateCache(Product{food, kcal}) {
+		return false
 	}
 
-	var ret []uint32
-	for k := range b.products[food] {
-		ret = append(ret, k)
+	isNew := false
+	if _, ok := p.all[food]; !ok {
+		p.all[food] = make(map[uint32]bool)
+		isNew = true
 	}
-	sort.Slice(ret, func(i, j int) bool { return ret[i] < ret[j] })
-	return ret, true
+	if _, ok := p.all[food][kcal]; !ok {
+		p.all[food][kcal] = true
+		isNew = true
+	}
+	return isNew
+}
+
+// true - already in cache, false - otherwise.
+func (p *products) updateCache(product Product) bool {
+	bytes, _ := json.Marshal(product)
+	added := string(bytes)
+
+	for _, cached := range p.cache {
+		if cached == added {
+			return true
+		}
+	}
+
+	p.cache = append(p.cache, added)
+	if len(p.cache) > p.cacheSize {
+		p.cache = p.cache[1:]
+	}
+	return false
+}
+
+func normalize(pattern string) string {
+	return strings.Trim(strings.ToLower(pattern), "\n\t\r, .\"'")
 }

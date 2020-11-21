@@ -33,24 +33,16 @@ func main() {
 	updates, err := bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		if update.Message == nil { // ignore any non-Message Updates
+		if update.CallbackQuery != nil {
+			msg := fbot.RespondToKeyboard(update.CallbackQuery)
+			bot.Send(msg)
 			continue
 		}
 
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "I don't understand you")
-		switch text, err := fbot.RespondTo(update.Message.From.UserName, update.Message.Text); err {
-		case nil:
-			msg.Text = text
-			msg.ParseMode = "MarkdownV2"
-		case foodbot.ErrUserNotFound:
-			msg.Text = "You aren't a user of this bot."
-			msg.ReplyToMessageID = update.Message.MessageID
-		default:
-			msg.Text = err.Error()
-			msg.ReplyToMessageID = update.Message.MessageID
+		if update.Message != nil {
+			msg := fbot.RespondTo(update.Message)
+			log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
+			bot.Send(msg)
 		}
-
-		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
-		bot.Send(msg)
 	}
 }

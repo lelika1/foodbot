@@ -1,14 +1,13 @@
 package foodbot
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
-	"regexp"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/lelika1/foodbot/internal/sqlite"
 )
 
@@ -41,44 +40,84 @@ func createUsers(users []sqlite.User) map[string]*User {
 	return ret
 }
 
-// RespondTo the given message from the user.
-func (b *Bot) RespondTo(name string, msg string) (string, error) {
-	u, err := b.User(name)
+// RespondToKeyboard the given message from the user.
+func (b *Bot) RespondToKeyboard(msg *tgbotapi.CallbackQuery) tgbotapi.MessageConfig {
+	chatID := msg.Message.Chat.ID
+	msgID := msg.Message.MessageID
+
+	u, err := b.User(msg.From.UserName)
 	if err != nil {
-		return "", err
+		return errResponse(chatID, msgID, "You aren't a user of this bot.")
 	}
 
-	if msg == "/start" {
+	var p sqlite.Product
+	json.Unmarshal([]byte(msg.Data), &p)
+	if u.state == AskedForProduct || u.state == AskedForKcal {
+		u.inProgress.Product = p
+		u.state = AskedForGrams
+		return response(chatID, fmt.Sprintf("How many grams of `%q` have you eaten?", u.inProgress.Name), true)
+
+	}
+	return errResponse(chatID, msgID, "I don't understand you")
+}
+
+// RespondTo the given message from the user.
+func (b *Bot) RespondTo(msg *tgbotapi.Message) tgbotapi.MessageConfig {
+	chatID := msg.Chat.ID
+	msgID := msg.MessageID
+
+	u, err := b.User(msg.From.UserName)
+	if err != nil {
+		return errResponse(chatID, msgID, "You aren't a user of this bot.")
+	}
+
+	input := msg.Text
+	if input == "/start" {
 		u.state = AskedForLimit
-		return "Hi\\! What's your daily limit \\(kcal\\)?", nil
+		return response(chatID, "Hi! What's your daily limit (kcal)?", false)
 	}
 
-	if msg == "/cancel" {
-		return b.handleCancel(u)
+	if input == "/cancel" {
+		return b.handleCancel(u, chatID)
 	}
 
 	switch u.state {
 	case AskedForLimit:
-		return b.handleLimit(u, msg)
+		return b.handleLimit(u, chatID, msgID, input)
 	case AskedForProduct, AskedForKcal, AskedForGrams:
-		return b.handleAdd(u, msg)
+		return b.handleAdd(u, chatID, msgID, input)
 	}
 
-	switch msg {
+	switch input {
 	case "/limit":
 		u.state = AskedForLimit
-		return "Ok, what's your new daily limit \\(kcal\\)?", nil
+		return response(chatID, "Ok, what's your new daily limit (kcal)?", false)
 	case "/add":
 		u.inProgress.When = time.Now()
 		u.state = AskedForProduct
-		return "All right\\! Tell me, what have you eaten?", nil
+		last := b.lastAdded()
+		if len(last) == 0 {
+			return response(chatID, "All right! Tell me, what have you eaten?", false)
+		}
+
+		ret := tgbotapi.NewMessage(msg.Chat.ID, "")
+		ret.Text = "These products were recently reported to the bot. Choose one of them, or enter what have you eaten.\n"
+		var rows [][]tgbotapi.InlineKeyboardButton
+		for _, p := range last {
+			data, _ := json.Marshal(p)
+			row := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
+				p.String(), string(data)))
+			rows = append(rows, row)
+		}
+		ret.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
+		return ret
 	case "/stat":
-		return formatStat(b.todayReports(u), u.Limit), nil
+		return response(chatID, formatStat(b.todayReports(u), u.Limit), true)
 	case "/stat7":
-		return formatStat7(b.weeklyStat(u), u.Limit), nil
+		return response(chatID, formatStat7(b.weeklyStat(u), u.Limit), true)
 	}
 
-	return "", errors.New("I don't understand you")
+	return errResponse(chatID, msgID, "I don't understand you")
 }
 
 // weeklyStat for this user.
@@ -109,76 +148,75 @@ func (b *Bot) todayReports(u *User) []sqlite.Report {
 	return reports
 }
 
-func (b *Bot) handleCancel(u *User) (string, error) {
+func (b *Bot) handleCancel(u *User, chatID int64) tgbotapi.MessageConfig {
 	switch u.state {
 	case Default:
-		return "Nothing to cancel\\.\\.\\. Maybe /add food or see /stat for today?", nil
+		return response(chatID, "Nothing to cancel... Maybe /add food or see /stat for today?", false)
 	case AskedForLimit:
 		u.state = Default
-		return fmt.Sprintf("Ok\\. Your limit is still %v kcal\\.", u.Limit), nil
+		return response(chatID, fmt.Sprintf("Ok. Your limit is still %v kcal.", u.Limit), false)
 	default:
 		u.inProgress = sqlite.Report{}
 		u.state = Default
-		return "All right, no food has been reported\\.", nil
+		return response(chatID, "All right, no food has been reported.", false)
 	}
 }
 
-func (b *Bot) handleLimit(u *User, msg string) (string, error) {
-	limit, err := strconv.ParseUint(msg, 10, 32)
+func (b *Bot) handleLimit(u *User, chatID int64, msgID int, text string) tgbotapi.MessageConfig {
+	limit, err := strconv.ParseUint(text, 10, 32)
 	if err != nil {
-		return "", fmt.Errorf("%q is not an integer. Enter your daily limit (kcal)", msg)
+		return errResponse(chatID, msgID, fmt.Sprintf("%q is not an integer. Enter your daily limit (kcal)", text))
 	}
 
 	u.Limit = uint32(limit)
 	u.state = Default
-	return "Limit saved, thanks\\! Now you can /add food or see /stat for today\\.", nil
+	return response(chatID, "Limit saved, thanks! Now you can /add food or see /stat for today.", false)
 }
 
-func (b *Bot) handleAdd(u *User, msg string) (string, error) {
+func (b *Bot) handleAdd(u *User, chatID int64, msgID int, text string) tgbotapi.MessageConfig {
 	switch u.state {
 	case AskedForProduct:
-		u.inProgress.Product = msg
+		u.inProgress.Name = text
 		u.state = AskedForKcal
 
-		kcals, ok := b.GetProductKcals(u.inProgress.Product)
-		if !ok {
+		products := b.GetProducts(u.inProgress.Name)
+
+		if len(products) == 0 {
 			u.state = AskedForKcal
-			return fmt.Sprintf("How many calories \\(kcal per 💯g\\) are there in `%q`?", u.inProgress.Product), nil
+			return response(chatID, fmt.Sprintf("How many calories \\(kcal per 💯g\\) are there in `%q`?", u.inProgress.Name), true)
 		}
 
-		var sb strings.Builder
-		fmt.Fprintf(&sb, "Choose kcal for `%q` from the list:\n", u.inProgress.Product)
-		for _, kcal := range kcals {
-			fmt.Fprintf(&sb, "*/%v kcal*\n", kcal)
+		ret := tgbotapi.NewMessage(chatID, "")
+		ret.Text = fmt.Sprintf("Choose one of the products from the list or enter new calorie amount \\(kcal per 💯g\\) for %q\\.\n", u.inProgress.Name)
+		ret.ParseMode = "MarkdownV2"
+		var rows [][]tgbotapi.InlineKeyboardButton
+		for _, p := range products {
+			data, _ := json.Marshal(p)
+			row := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(p.String(), string(data)))
+			rows = append(rows, row)
 		}
-		fmt.Fprintf(&sb, "\nOr enter new calorie amount \\(kcal per 💯g\\)\\.\n")
-
-		return sb.String(), nil
+		ret.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
+		return ret
 
 	case AskedForKcal:
-		var kcalReg = regexp.MustCompile(`/[0-9]+`)
-		if kcalReg.MatchString(msg) {
-			msg = msg[1:]
-		}
-
-		kcal, err := strconv.ParseUint(msg, 10, 32)
+		kcal, err := strconv.ParseUint(text, 10, 32)
 		if err != nil {
-			return "", fmt.Errorf("%q is not an integer. Enter kcal per 💯g for %q", msg, u.inProgress.Product)
+			return errResponse(chatID, msgID, fmt.Sprintf("%q is not an integer. Enter kcal per 💯g for %q", text, u.inProgress.Name))
 		}
 
 		u.inProgress.Kcal = uint32(kcal)
 		u.state = AskedForGrams
-		return fmt.Sprintf("How many grams of `%q` have you eaten?", u.inProgress.Product), nil
+		return response(chatID, fmt.Sprintf("How many grams of `%q` have you eaten?", u.inProgress.Name), true)
 
 	case AskedForGrams:
-		grams, err := strconv.ParseUint(msg, 10, 32)
+		grams, err := strconv.ParseUint(text, 10, 32)
 		if err != nil {
-			return "", fmt.Errorf("%q is not an integer. Enter how many grams you've eaten", msg)
+			return errResponse(chatID, msgID, fmt.Sprintf("%q is not an integer. Enter how many grams you've eaten", text))
 		}
 
 		u.inProgress.Grams = uint32(grams)
 		b.SaveReport(u.ID, u.inProgress)
-		b.AddProductKcal(u.inProgress.Product, u.inProgress.Kcal)
+		b.AddProduct(u.inProgress.Name, u.inProgress.Kcal)
 
 		total := TotalKcal(b.TodayReports(u.ID))
 		var ret string
@@ -190,8 +228,24 @@ func (b *Bot) handleAdd(u *User, msg string) (string, error) {
 
 		u.inProgress = sqlite.Report{}
 		u.state = Default
-		return ret, nil
+		return response(chatID, ret, true)
 	default:
-		return "", nil
+		return response(chatID, "", false)
 	}
+}
+
+func response(chatID int64, text string, isMarkdown bool) tgbotapi.MessageConfig {
+	ret := tgbotapi.NewMessage(chatID, "")
+	ret.Text = text
+	if isMarkdown {
+		ret.ParseMode = "MarkdownV2"
+	}
+	return ret
+}
+
+func errResponse(chatID int64, messageID int, text string) tgbotapi.MessageConfig {
+	ret := tgbotapi.NewMessage(chatID, "")
+	ret.Text = text
+	ret.ReplyToMessageID = messageID
+	return ret
 }

@@ -1,6 +1,8 @@
 package sqlite
 
-import "time"
+import (
+	"time"
+)
 
 // User represents a row in the USER table.
 type User struct {
@@ -11,14 +13,13 @@ type User struct {
 
 // Product represents a row in the Product table.
 type Product struct {
-	Name string
-	Kcal uint32
+	Name string `json:"Name"`
+	Kcal uint32 `json:"Kcal"`
 }
 
 // Report represents a row in the Reports table.
 type Report struct {
-	When    time.Time
-	Product string
-	Kcal    uint32
-	Grams   uint32
+	Product
+	Grams uint32
+	When  time.Time
 }

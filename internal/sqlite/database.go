@@ -86,7 +86,7 @@ func (d *DB) TodayReports(uid int) []Report {
 	for rows.Next() {
 		var r Report
 		var date, hours string
-		if err = rows.Scan(&date, &hours, &r.Product, &r.Kcal, &r.Grams); err == nil {
+		if err = rows.Scan(&date, &hours, &r.Name, &r.Kcal, &r.Grams); err == nil {
 			r.When, _ = time.Parse("Mon 2006/01/02 15:04:05", date+" "+hours)
 			reports = append(reports, r)
 		}
@@ -131,7 +131,7 @@ func (d *DB) SaveReport(uid int, r Report) {
 	if stmt, err := d.db.Prepare(insertReportQuery); err == nil {
 		date := r.When.Format("Mon 2006/01/02")
 		hours := r.When.Format("15:04:05")
-		if _, err := stmt.Exec(uid, date, hours, r.Product, r.Kcal, r.Grams); err != nil {
+		if _, err := stmt.Exec(uid, date, hours, r.Name, r.Kcal, r.Grams); err != nil {
 			log.Printf("Exec failed with: %q", err)
 		}
 	} else {

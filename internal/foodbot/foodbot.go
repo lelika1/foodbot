@@ -9,9 +9,9 @@ import (
 // Bot stores all the information and connection to the database.
 type Bot struct {
 	*sqlite.DB
+	products
 
-	users    map[string]*User
-	products Products
+	users map[string]*User
 }
 
 // NewBot connects to the given DB and loads all stored information for the foodbot.
@@ -22,9 +22,9 @@ func NewBot(dbPath string) (*Bot, error) {
 	}
 
 	return &Bot{
-		users:    createUsers(db.Users()),
-		products: createProducts(db.Products()),
 		DB:       db,
+		products: newProducts(db.Products()),
+		users:    createUsers(db.Users()),
 	}, nil
 }
 
@@ -53,4 +53,17 @@ func TotalKcal(reports []sqlite.Report) uint32 {
 		ret += r.Kcal * r.Grams
 	}
 	return ret / 100
+}
+
+// AddProduct adds a new energy value for the given product.
+func (b *Bot) AddProduct(name string, kcal uint32) {
+	if b.addProduct(name, kcal) {
+		b.SaveProduct(name, kcal)
+	}
+}
+
+// GetProducts returns a list of products with name similar to the pattern.
+// Returns false if such product has not been added before.
+func (b *Bot) GetProducts(pattern string) []Product {
+	return b.similar(pattern)
 }

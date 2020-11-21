@@ -24,7 +24,7 @@ const createTablesQuery = `
 		FOREIGN KEY(USER_ID) REFERENCES USER(ID) ON DELETE CASCADE
 	);`
 
-const insertProductQuery = `INSERT INTO PRODUCT(name, kcal) values(?, ?);`
+const insertProductQuery = `INSERT OR IGNORE INTO PRODUCT(name, kcal) values(?, ?);`
 
 const insertReportQuery = `INSERT INTO REPORTS(user_id, date, time, product, kcal, grams) values(?, ?, ?, ?, ?, ?);`
 
