@@ -122,18 +122,19 @@ func (b *Bot) RespondTo(msg *tgbotapi.Message) tgbotapi.MessageConfig {
 
 // weeklyStat for this user.
 func (b *Bot) weeklyStat(u *User) []dayResult {
-	var week []string
+	var week []time.Time
 	now := time.Now()
 	for delta := 0; delta <= 6; delta++ {
-		week = append(week, now.AddDate(0, 0, -delta).Format("Mon 2006/01/02"))
+		week = append(week, now.AddDate(0, 0, -delta))
 	}
 
 	history := b.History(u.ID, week...)
 	var ret []dayResult
 	for _, day := range week {
-		total := history[day]
+		date := day.Format("Mon 2006/01/02")
+		total := history[date]
 		ret = append(ret, dayResult{
-			Date:    day,
+			Date:    date,
 			Kcal:    total,
 			InLimit: total < u.Limit,
 		})

@@ -1,6 +1,9 @@
 package sqlite
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 const createTablesQuery = `
     CREATE TABLE IF NOT EXISTS USER(
@@ -16,8 +19,7 @@ const createTablesQuery = `
 	);
 	CREATE TABLE IF NOT EXISTS REPORTS(
 		USER_ID         INTEGER                               NOT NULL,
-		DATE            TEXT                                  NOT NULL,
-		TIME            TEXT                                  NOT NULL,
+		TIME			INTEGER								  NOT NULL,
 		PRODUCT         TEXT                                  NOT NULL,
         KCAL            INTEGER                               NOT NULL,
         GRAMS           INTEGER                               NOT NULL,
@@ -26,23 +28,25 @@ const createTablesQuery = `
 
 const insertProductQuery = `INSERT OR IGNORE INTO PRODUCT(name, kcal) values(?, ?);`
 
-const insertReportQuery = `INSERT INTO REPORTS(user_id, date, time, product, kcal, grams) values(?, ?, ?, ?, ?, ?);`
+const insertReportQuery = `INSERT INTO REPORTS(user_id, time, product, kcal, grams) values(?, ?, ?, ?, ?);`
 
-const selectTodayQuery = "SELECT DATE, TIME, LOWER(PRODUCT), KCAL, GRAMS FROM REPORTS WHERE USER_ID=? AND DATE=? AND GRAMS!=0;"
+const selectTodayQuery = "SELECT TIME, LOWER(PRODUCT), KCAL, GRAMS FROM REPORTS WHERE USER_ID=? AND TIME / (24 * 60 * 60)=? AND GRAMS!=0;"
 
-func selectReportsQuery(uid int, dates ...string) (string, []interface{}) {
+const secondsInDay = 24 * 60 * 60
+
+func selectReportsQuery(uid int, dates ...time.Time) (string, []interface{}) {
 	if len(dates) == 0 {
-		return "SELECT DATE, SUM(KCAL * GRAMS)/100 FROM REPORTS WHERE DATE IN() GROUP BY DATE;", []interface{}{uid}
+		return "SELECT TIME, SUM(KCAL * GRAMS)/100 FROM REPORTS WHERE TIME/(24 * 60 * 60) IN() GROUP BY TIME/(24 * 60 * 60);", []interface{}{uid}
 	}
 
 	var sb strings.Builder
-	sb.WriteString("SELECT DATE, SUM(KCAL * GRAMS)/100  FROM REPORTS WHERE DATE IN(?")
+	sb.WriteString("SELECT TIME, SUM(KCAL * GRAMS)/100 FROM REPORTS WHERE TIME/(24 * 60 * 60) IN(?")
 	sb.WriteString(strings.Repeat(",?", len(dates)-1))
-	sb.WriteString(") GROUP BY DATE;")
+	sb.WriteString(") GROUP BY TIME/(24 * 60 * 60);")
 
 	args := []interface{}{uid}
 	for _, date := range dates {
-		args = append(args, date)
+		args = append(args, date.Unix()/secondsInDay)
 	}
 	return sb.String(), args
 }

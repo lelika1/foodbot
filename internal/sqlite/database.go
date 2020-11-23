@@ -75,7 +75,7 @@ func (d *DB) Products() []Product {
 
 // TodayReports of the user.
 func (d *DB) TodayReports(uid int) []Report {
-	rows, err := d.db.Query(selectTodayQuery, uid, time.Now().Format("Mon 2006/01/02"))
+	rows, err := d.db.Query(selectTodayQuery, uid, time.Now().Unix()/secondsInDay)
 	if err != nil {
 		log.Printf("%q failed with: %q", selectTodayQuery, err)
 		return nil
@@ -85,9 +85,9 @@ func (d *DB) TodayReports(uid int) []Report {
 	var reports []Report
 	for rows.Next() {
 		var r Report
-		var date, hours string
-		if err = rows.Scan(&date, &hours, &r.Name, &r.Kcal, &r.Grams); err == nil {
-			r.When, _ = time.Parse("Mon 2006/01/02 15:04:05", date+" "+hours)
+		var when int64
+		if err = rows.Scan(&when, &r.Name, &r.Kcal, &r.Grams); err == nil {
+			r.When = time.Unix(when, 0)
 			reports = append(reports, r)
 		}
 	}
@@ -95,7 +95,7 @@ func (d *DB) TodayReports(uid int) []Report {
 }
 
 // History of the user in the given days.
-func (d *DB) History(uid int, dates ...string) map[string]uint32 {
+func (d *DB) History(uid int, dates ...time.Time) map[string]uint32 {
 	sql, args := selectReportsQuery(uid, dates...)
 	rows, err := d.db.Query(sql, args...)
 	if err != nil {
@@ -106,10 +106,10 @@ func (d *DB) History(uid int, dates ...string) map[string]uint32 {
 
 	history := make(map[string]uint32)
 	for rows.Next() {
-		var date string
+		var when int64
 		var kcal uint32
-		if err = rows.Scan(&date, &kcal); err == nil {
-			history[date] = kcal
+		if err = rows.Scan(&when, &kcal); err == nil {
+			history[time.Unix(when, 0).Format("Mon 2006/01/02")] = kcal
 		}
 	}
 	return history
@@ -129,9 +129,8 @@ func (d *DB) SaveProduct(food string, kcal uint32) {
 // SaveReport of the user into the database.
 func (d *DB) SaveReport(uid int, r Report) {
 	if stmt, err := d.db.Prepare(insertReportQuery); err == nil {
-		date := r.When.Format("Mon 2006/01/02")
-		hours := r.When.Format("15:04:05")
-		if _, err := stmt.Exec(uid, date, hours, r.Name, r.Kcal, r.Grams); err != nil {
+		when := r.When.Unix()
+		if _, err := stmt.Exec(uid, when, r.Name, r.Kcal, r.Grams); err != nil {
 			log.Printf("Exec failed with: %q", err)
 		}
 	} else {
