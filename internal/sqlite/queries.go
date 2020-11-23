@@ -28,7 +28,7 @@ const insertProductQuery = `INSERT OR IGNORE INTO PRODUCT(name, kcal) values(?, 
 
 const insertReportQuery = `INSERT INTO REPORTS(user_id, date, time, product, kcal, grams) values(?, ?, ?, ?, ?, ?);`
 
-const selectTodayQuery = "SELECT DATE, TIME, LOWER(PRODUCT), KCAL, GRAMS FROM REPORTS WHERE USER_ID=? AND DATE=?;"
+const selectTodayQuery = "SELECT DATE, TIME, LOWER(PRODUCT), KCAL, GRAMS FROM REPORTS WHERE USER_ID=? AND DATE=? AND GRAMS!=0;"
 
 func selectReportsQuery(uid int, dates ...string) (string, []interface{}) {
 	if len(dates) == 0 {
