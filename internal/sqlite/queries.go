@@ -32,6 +32,8 @@ const insertReportQuery = `INSERT INTO REPORTS(user_id, time, product, kcal, gra
 
 const selectTodayQuery = "SELECT TIME, LOWER(PRODUCT), KCAL, GRAMS FROM REPORTS WHERE USER_ID=? AND TIME / (24 * 60 * 60)=? AND GRAMS!=0;"
 
+const selectLastProducts = "SELECT MAX(TIME), LOWER(PRODUCT), KCAL FROM REPORTS group by LOWER(PRODUCT), KCAL order by time desc limit ?;"
+
 const secondsInDay = 24 * 60 * 60
 
 func selectReportsQuery(uid int, dates ...time.Time) (string, []interface{}) {

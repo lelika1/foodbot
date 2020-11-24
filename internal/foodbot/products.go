@@ -1,7 +1,6 @@
 package foodbot
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -12,16 +11,13 @@ import (
 // Product is alias for sqlite.Product.
 type Product sqlite.Product
 
-func (p *Product) String() string {
+func (p Product) String() string {
 	return fmt.Sprintf("%v %v kcal", p.Name, p.Kcal)
 }
 
 // products stores information as (product's name: {kcal1: true, kcal2: true}).
-// Also stores cache of last added products.
 type products struct {
-	all       map[string]map[uint32]bool
-	cache     []string
-	cacheSize int
+	all map[string]map[uint32]bool
 }
 
 func newProducts(list []sqlite.Product) products {
@@ -32,15 +28,7 @@ func newProducts(list []sqlite.Product) products {
 		}
 		all[p.Name][p.Kcal] = true
 	}
-	return products{all: all, cacheSize: 5}
-}
-
-func (p *products) lastAdded() []Product {
-	var ret []Product = make([]Product, len(p.cache))
-	for i, cached := range p.cache {
-		json.Unmarshal([]byte(cached), &ret[i])
-	}
-	return ret
+	return products{all: all}
 }
 
 func (p *products) similar(name string) []Product {
@@ -60,9 +48,6 @@ func (p *products) similar(name string) []Product {
 // returns true if (name, kcal) was new, and false otherwise.
 func (p *products) addProduct(name string, kcal uint32) bool {
 	food := normalize(name)
-	if p.updateCache(Product{food, kcal}) {
-		return false
-	}
 
 	isNew := false
 	if _, ok := p.all[food]; !ok {
@@ -74,24 +59,6 @@ func (p *products) addProduct(name string, kcal uint32) bool {
 		isNew = true
 	}
 	return isNew
-}
-
-// true - already in cache, false - otherwise.
-func (p *products) updateCache(product Product) bool {
-	bytes, _ := json.Marshal(product)
-	added := string(bytes)
-
-	for _, cached := range p.cache {
-		if cached == added {
-			return true
-		}
-	}
-
-	p.cache = append(p.cache, added)
-	if len(p.cache) > p.cacheSize {
-		p.cache = p.cache[1:]
-	}
-	return false
 }
 
 func normalize(pattern string) string {

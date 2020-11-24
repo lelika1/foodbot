@@ -95,7 +95,7 @@ func (b *Bot) RespondTo(msg *tgbotapi.Message) tgbotapi.MessageConfig {
 	case "/add":
 		u.inProgress.When = time.Now()
 		u.state = AskedForProduct
-		last := b.lastAdded()
+		last := b.LastProducts(5)
 		if len(last) == 0 {
 			return response(chatID, "All right! Tell me, what have you eaten?", false)
 		}
@@ -106,7 +106,7 @@ func (b *Bot) RespondTo(msg *tgbotapi.Message) tgbotapi.MessageConfig {
 		for _, p := range last {
 			data, _ := json.Marshal(p)
 			row := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
-				p.String(), string(data)))
+				Product(p).String(), string(data)))
 			rows = append(rows, row)
 		}
 		ret.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)

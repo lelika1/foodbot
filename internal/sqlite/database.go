@@ -73,6 +73,26 @@ func (d *DB) Products() []Product {
 	return products
 }
 
+// LastProducts returns n last added products.
+func (d *DB) LastProducts(n int) []Product {
+	rows, err := d.db.Query(selectLastProducts, n)
+	if err != nil {
+		log.Printf("%q failed with: %q", selectLastProducts, err)
+		return nil
+	}
+	defer rows.Close()
+
+	var products []Product
+	for rows.Next() {
+		var p Product
+		var when int64
+		if err = rows.Scan(&when, &p.Name, &p.Kcal); err == nil {
+			products = append(products, p)
+		}
+	}
+	return products
+}
+
 // TodayReports of the user.
 func (d *DB) TodayReports(uid int) []Report {
 	rows, err := d.db.Query(selectTodayQuery, uid, time.Now().Unix()/secondsInDay)
