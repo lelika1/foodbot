@@ -50,10 +50,8 @@ func (b *Bot) RespondToKeyboard(msg *tgbotapi.CallbackQuery) tgbotapi.MessageCon
 		return errResponse(chatID, msgID, "You aren't a user of this bot.")
 	}
 
-	var p sqlite.Product
-	json.Unmarshal([]byte(msg.Data), &p)
 	if u.state == AskedForProduct || u.state == AskedForKcal {
-		u.inProgress.Product = p
+		json.Unmarshal([]byte(msg.Data), &u.inProgress.Product)
 		u.state = AskedForGrams
 		return response(chatID, fmt.Sprintf("How many grams of `%q` have you eaten?", u.inProgress.Name), true)
 
@@ -106,7 +104,7 @@ func (b *Bot) RespondTo(msg *tgbotapi.Message) tgbotapi.MessageConfig {
 		for _, p := range last {
 			data, _ := json.Marshal(p)
 			row := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
-				Product(p).String(), string(data)))
+				p.String(), string(data)))
 			rows = append(rows, row)
 		}
 		ret.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
@@ -180,8 +178,7 @@ func (b *Bot) handleAdd(u *User, chatID int64, msgID int, text string) tgbotapi.
 		u.inProgress.Name = text
 		u.state = AskedForKcal
 
-		products := b.GetProducts(u.inProgress.Name)
-
+		products := b.GetSimilarProducts(u.inProgress.Name)
 		if len(products) == 0 {
 			u.state = AskedForKcal
 			return response(chatID, fmt.Sprintf("How many calories \\(kcal per 💯g\\) are there in `%q`?", u.inProgress.Name), true)

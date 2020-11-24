@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -15,6 +16,10 @@ type User struct {
 type Product struct {
 	Name string `json:"Name"`
 	Kcal uint32 `json:"Kcal"`
+}
+
+func (p Product) String() string {
+	return fmt.Sprintf("%v %v kcal", p.Name, p.Kcal)
 }
 
 // Report represents a row in the Reports table.

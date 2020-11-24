@@ -62,8 +62,8 @@ func (b *Bot) AddProduct(name string, kcal uint32) {
 	}
 }
 
-// GetProducts returns a list of products with name similar to the pattern.
+// GetSimilarProducts returns a list of products with name similar to the pattern.
 // Returns false if such product has not been added before.
-func (b *Bot) GetProducts(pattern string) []Product {
+func (b *Bot) GetSimilarProducts(pattern string) []sqlite.Product {
 	return b.similar(pattern)
 }
