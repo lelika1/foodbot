@@ -36,7 +36,7 @@ func (p products) similar(name string) []sqlite.Product {
 }
 
 // returns true if (name, kcal) was new, and false otherwise.
-func (p products) addProduct(name string, kcal uint32) bool {
+func (p products) add(name string, kcal uint32) bool {
 	food := normalize(name)
 
 	isNew := false

@@ -8,10 +8,9 @@ import (
 
 // Bot stores all the information and connection to the database.
 type Bot struct {
-	*sqlite.DB
-	products
-
-	users map[string]*User
+	db       *sqlite.DB
+	users    map[string]*user
+	products products
 }
 
 // NewBot connects to the given DB and loads all stored information for the foodbot.
@@ -22,7 +21,7 @@ func NewBot(dbPath string) (*Bot, error) {
 	}
 
 	return &Bot{
-		DB:       db,
+		db:       db,
 		products: newProducts(db.Products()),
 		users:    createUsers(db.Users()),
 	}, nil
@@ -30,40 +29,25 @@ func NewBot(dbPath string) (*Bot, error) {
 
 // Stop connection to the database.
 func (b *Bot) Stop() {
-	b.Close()
+	b.db.Close()
 }
 
-// ErrUserNotFound means the bot doesn't have such user.
-var ErrUserNotFound = errors.New("user was not found")
+// errUserNotFound means the bot doesn't have such user.
+var errUserNotFound = errors.New("user was not found")
 
 // User finds an user with the given name.
 // Returns an ErrUserNotFound if such user doesn't exists.
-func (b *Bot) User(name string) (*User, error) {
+func (b *Bot) user(name string) (*user, error) {
 	if user, ok := b.users[name]; ok {
 		return user, nil
 	}
 
-	return nil, ErrUserNotFound
-}
-
-// TotalKcal calculates energy of all eaten food.
-func TotalKcal(reports []sqlite.Report) uint32 {
-	var ret uint32
-	for _, r := range reports {
-		ret += r.Kcal * r.Grams
-	}
-	return ret / 100
+	return nil, errUserNotFound
 }
 
 // AddProduct adds a new energy value for the given product.
 func (b *Bot) AddProduct(name string, kcal uint32) {
-	if b.addProduct(name, kcal) {
-		b.SaveProduct(name, kcal)
+	if b.products.add(name, kcal) {
+		b.db.SaveProduct(name, kcal)
 	}
-}
-
-// GetSimilarProducts returns a list of products with name similar to the pattern.
-// Returns false if such product has not been added before.
-func (b *Bot) GetSimilarProducts(pattern string) []sqlite.Product {
-	return b.similar(pattern)
 }

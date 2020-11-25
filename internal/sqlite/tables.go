@@ -28,3 +28,12 @@ type Report struct {
 	Grams uint32
 	When  time.Time
 }
+
+// TotalKcal calculates energy of all eaten food.
+func TotalKcal(reports []Report) uint32 {
+	var ret uint32
+	for _, r := range reports {
+		ret += r.Kcal * r.Grams
+	}
+	return ret / 100
+}
