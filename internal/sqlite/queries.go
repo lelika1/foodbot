@@ -37,13 +37,9 @@ const selectLastProducts = "SELECT MAX(TIME), LOWER(PRODUCT), KCAL FROM REPORTS 
 const secondsInDay = 24 * 60 * 60
 
 func selectReportsQuery(uid int, dates ...time.Time) (string, []interface{}) {
-	if len(dates) == 0 {
-		return "SELECT TIME, SUM(KCAL * GRAMS)/100 FROM REPORTS WHERE TIME/(24 * 60 * 60) IN() GROUP BY TIME/(24 * 60 * 60);", []interface{}{uid}
-	}
-
 	var sb strings.Builder
-	sb.WriteString("SELECT TIME, SUM(KCAL * GRAMS)/100 FROM REPORTS WHERE TIME/(24 * 60 * 60) IN(?")
-	sb.WriteString(strings.Repeat(",?", len(dates)-1))
+	sb.WriteString("SELECT TIME, SUM(KCAL * GRAMS)/100 FROM REPORTS WHERE USER_ID=? AND TIME/(24 * 60 * 60) IN(")
+	sb.WriteString(strings.Trim(strings.Repeat("?,", len(dates)), ","))
 	sb.WriteString(") GROUP BY TIME/(24 * 60 * 60);")
 
 	args := []interface{}{uid}
