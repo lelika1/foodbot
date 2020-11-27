@@ -43,18 +43,19 @@ func formatStat(reports []sqlite.Report, limit uint32) string {
 	var total uint32
 	var maxLen int
 	for i, r := range reports {
-		kcal := r.Kcal * r.Grams / 100
+		kcal := r.Kcal * r.Grams
 		total += kcal
 
 		lines = append(lines, Line{
 			Begin: fmt.Sprintf("%s: %v", r.When.Format("15:04:05"), r.Name),
-			End:   fmt.Sprintf("%v kcal", kcal),
+			End:   fmt.Sprintf("%v kcal", kcal/100),
 		})
 
 		if l := utf8.RuneCountInString(lines[i].Begin) + utf8.RuneCountInString(lines[i].End); maxLen < l {
 			maxLen = l
 		}
 	}
+	total /= 100
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "You ate today *%v kcal*:\n", total)
