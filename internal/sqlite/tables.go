@@ -7,9 +7,10 @@ import (
 
 // User represents a row in the USER table.
 type User struct {
-	ID    int
-	Name  string
-	Limit uint32
+	ID       int
+	Name     string
+	Limit    uint32
+	Location *time.Location
 }
 
 // Product represents a row in the Product table.

@@ -121,7 +121,7 @@ func (b *Bot) RespondTo(msg *tgbotapi.Message) tgbotapi.MessageConfig {
 // weeklyStat for this user.
 func (b *Bot) weeklyStat(u *user) []dayResult {
 	var week []time.Time
-	now := time.Now()
+	now := time.Now().In(u.Location)
 	for delta := 0; delta <= 6; delta++ {
 		week = append(week, now.AddDate(0, 0, -delta))
 	}
@@ -142,7 +142,7 @@ func (b *Bot) weeklyStat(u *user) []dayResult {
 
 // todayReports returns food eaten by this user today.
 func (b *Bot) todayReports(u *user) []sqlite.Report {
-	reports := b.db.TodayReports(u.ID)
+	reports := b.db.TodayReports(u.ID, time.Now().In(u.Location))
 	sort.Slice(reports, func(i, j int) bool { return reports[i].When.Before(reports[j].When) })
 	return reports
 }
@@ -216,7 +216,7 @@ func (b *Bot) handleAdd(u *user, chatID int64, msgID int, text string) tgbotapi.
 		b.db.SaveReport(u.ID, u.inProgress)
 		b.AddProduct(u.inProgress.Name, u.inProgress.Kcal)
 
-		total := sqlite.TotalKcal(b.db.TodayReports(u.ID))
+		total := sqlite.TotalKcal(b.db.TodayReports(u.ID, time.Now().In(u.Location)))
 		var ret string
 		if total < u.Limit {
 			ret = fmt.Sprintf("Noted\\. *%v kcal* left for today 😋\nLet's /add more food\\.", u.Limit-total)

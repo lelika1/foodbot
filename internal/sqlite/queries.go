@@ -9,7 +9,8 @@ const createTablesQuery = `
     CREATE TABLE IF NOT EXISTS USER(
 		ID              INTEGER   PRIMARY KEY   AUTOINCREMENT NOT NULL,
 		NAME            TEXT                                  NOT NULL,
-		DAILY_LIMIT           INTEGER   DEFAULT 0                   NOT NULL,
+		DAILY_LIMIT		INTEGER   DEFAULT 0                   NOT NULL,
+		TIMEZONE		TEXT 	  DEFAULT 'UTC'				  NOT NULL,
 		UNIQUE (NAME)
 	);
 	CREATE TABLE IF NOT EXISTS PRODUCT(
@@ -30,21 +31,21 @@ const insertProductQuery = `INSERT OR IGNORE INTO PRODUCT(name, kcal) values(?, 
 
 const insertReportQuery = `INSERT INTO REPORTS(user_id, time, product, kcal, grams) values(?, ?, ?, ?, ?);`
 
-const selectTodayQuery = "SELECT TIME, LOWER(PRODUCT), KCAL, GRAMS FROM REPORTS WHERE USER_ID=? AND TIME / (24 * 60 * 60)=? AND GRAMS!=0;"
+const selectTodayQuery = "SELECT TIME, LOWER(PRODUCT), KCAL, GRAMS FROM REPORTS WHERE USER_ID=?1 AND GRAMS!=0 AND (TIME + ?2)/?3 = ?4;"
 
 const selectLastProducts = "SELECT MAX(TIME), LOWER(PRODUCT), KCAL FROM REPORTS group by LOWER(PRODUCT), KCAL order by time desc limit ?;"
 
 const secondsInDay = 24 * 60 * 60
 
-func selectReportsQuery(uid int, dates ...time.Time) (string, []interface{}) {
+func selectReportsQuery(uid int, offset int64, dates ...time.Time) (string, []interface{}) {
 	var sb strings.Builder
-	sb.WriteString("SELECT TIME, SUM(KCAL * GRAMS)/100 FROM REPORTS WHERE USER_ID=? AND TIME/(24 * 60 * 60) IN(")
+	sb.WriteString("SELECT TIME, SUM(KCAL * GRAMS)/100 FROM REPORTS WHERE USER_ID=?1 AND (TIME+?2)/?3 IN(")
 	sb.WriteString(strings.Trim(strings.Repeat("?,", len(dates)), ","))
-	sb.WriteString(") GROUP BY TIME/(24 * 60 * 60);")
+	sb.WriteString(") GROUP BY (TIME+?2)/?3;")
 
-	args := []interface{}{uid}
+	args := []interface{}{uid, offset, secondsInDay}
 	for _, date := range dates {
-		args = append(args, date.Unix()/secondsInDay)
+		args = append(args, (date.Unix()+offset)/secondsInDay)
 	}
 	return sb.String(), args
 }

@@ -47,7 +47,11 @@ func (d *DB) Users() []User {
 	var users []User
 	for rows.Next() {
 		var u User
-		if err = rows.Scan(&u.ID, &u.Name, &u.Limit); err == nil {
+		var zone string
+		if err = rows.Scan(&u.ID, &u.Name, &zone, &u.Limit); err == nil {
+			if u.Location, err = time.LoadLocation(zone); err != nil {
+				u.Location = time.Local
+			}
 			users = append(users, u)
 		}
 	}
@@ -94,8 +98,9 @@ func (d *DB) LastProducts(n int) []Product {
 }
 
 // TodayReports of the user.
-func (d *DB) TodayReports(uid int) []Report {
-	rows, err := d.db.Query(selectTodayQuery, uid, time.Now().Unix()/secondsInDay)
+func (d *DB) TodayReports(uid int, userTime time.Time) []Report {
+	_, offset := userTime.Zone()
+	rows, err := d.db.Query(selectTodayQuery, uid, offset, secondsInDay, (userTime.Unix()+int64(offset))/secondsInDay)
 	if err != nil {
 		log.Printf("%q failed with: %q", selectTodayQuery, err)
 		return nil
@@ -107,7 +112,7 @@ func (d *DB) TodayReports(uid int) []Report {
 		var r Report
 		var when int64
 		if err = rows.Scan(&when, &r.Name, &r.Kcal, &r.Grams); err == nil {
-			r.When = time.Unix(when, 0)
+			r.When = time.Unix(when, 0).In(userTime.Location())
 			reports = append(reports, r)
 		}
 	}
@@ -116,7 +121,12 @@ func (d *DB) TodayReports(uid int) []Report {
 
 // History of the user in the given days.
 func (d *DB) History(uid int, dates ...time.Time) map[string]uint32 {
-	sql, args := selectReportsQuery(uid, dates...)
+	if len(dates) == 0 {
+		return nil
+	}
+
+	_, offset := dates[0].Zone()
+	sql, args := selectReportsQuery(uid, int64(offset), dates...)
 	rows, err := d.db.Query(sql, args...)
 	if err != nil {
 		log.Printf("%q failed with: %q", sql, err)
@@ -129,7 +139,7 @@ func (d *DB) History(uid int, dates ...time.Time) map[string]uint32 {
 		var when int64
 		var kcal uint32
 		if err = rows.Scan(&when, &kcal); err == nil {
-			history[time.Unix(when, 0).Format("Mon 2006/01/02")] = kcal
+			history[time.Unix(when, 0).In(dates[0].Location()).Format("Mon 2006/01/02")] = kcal
 		}
 	}
 	return history
