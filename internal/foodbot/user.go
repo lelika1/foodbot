@@ -1,7 +1,6 @@
 package foodbot
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -17,7 +16,8 @@ type user struct {
 
 	state state
 	// For storing incomplete report (during askedFor{Product,Kcal,Grams} states).
-	inProgress sqlite.Report
+	inProgress       sqlite.Report
+	keyBoardProducts []sqlite.Product
 }
 
 // State of the communication with the user.
@@ -41,22 +41,30 @@ func createUsers(users []sqlite.User) map[string]*user {
 }
 
 // RespondToKeyboard the given message from the user.
-func (b *Bot) RespondToKeyboard(msg *tgbotapi.CallbackQuery) tgbotapi.MessageConfig {
-	chatID := msg.Message.Chat.ID
-	msgID := msg.Message.MessageID
+func (b *Bot) RespondToKeyboard(msg *tgbotapi.CallbackQuery) tgbotapi.EditMessageTextConfig {
+	response := tgbotapi.NewEditMessageText(msg.Message.Chat.ID, msg.Message.MessageID, "I don't understand you")
 
 	u, err := b.user(msg.From.UserName)
 	if err != nil {
-		return errResponse(chatID, msgID, "You aren't a user of this bot.")
+		return response
 	}
 
 	if u.state == askedForProduct || u.state == askedForKcal {
-		json.Unmarshal([]byte(msg.Data), &u.inProgress.Product)
-		u.state = askedForGrams
-		return response(chatID, fmt.Sprintf("How many grams of `%q` have you eaten?", u.inProgress.Name), true)
+		i, err := strconv.Atoi(msg.Data)
+		if err != nil || len(u.keyBoardProducts) <= i {
+			return response
+		}
 
+		u.inProgress.Product = u.keyBoardProducts[i]
+		u.state = askedForGrams
+		u.keyBoardProducts = nil
+
+		response.Text = fmt.Sprintf("How many grams of `%q` have you eaten?", u.inProgress.Name)
+		response.ParseMode = "MarkdownV2"
+		return response
 	}
-	return errResponse(chatID, msgID, "I don't understand you")
+
+	return response
 }
 
 // RespondTo the given message from the user.
@@ -100,14 +108,7 @@ func (b *Bot) RespondTo(msg *tgbotapi.Message) tgbotapi.MessageConfig {
 
 		ret := tgbotapi.NewMessage(msg.Chat.ID, "")
 		ret.Text = "These products were recently reported to the bot. Choose one of them, or enter what have you eaten.\n"
-		var rows [][]tgbotapi.InlineKeyboardButton
-		for _, p := range last {
-			data, _ := json.Marshal(p)
-			row := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
-				p.String(), string(data)))
-			rows = append(rows, row)
-		}
-		ret.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
+		ret.ReplyMarkup = createKeyBoard(u, last)
 		return ret
 	case "/stat":
 		return response(chatID, formatStat(b.todayReports(u), u.Limit), true)
@@ -180,20 +181,13 @@ func (b *Bot) handleAdd(u *user, chatID int64, msgID int, text string) tgbotapi.
 
 		products := b.products.similar(u.inProgress.Name)
 		if len(products) == 0 {
-			u.state = askedForKcal
 			return response(chatID, fmt.Sprintf("How many calories \\(kcal per 💯g\\) are there in `%q`?", u.inProgress.Name), true)
 		}
 
 		ret := tgbotapi.NewMessage(chatID, "")
 		ret.Text = fmt.Sprintf("Choose one of the products from the list or enter new calorie amount \\(kcal per 💯g\\) for %q\\.\n", u.inProgress.Name)
 		ret.ParseMode = "MarkdownV2"
-		var rows [][]tgbotapi.InlineKeyboardButton
-		for _, p := range products {
-			data, _ := json.Marshal(p)
-			row := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(p.String(), string(data)))
-			rows = append(rows, row)
-		}
-		ret.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
+		ret.ReplyMarkup = createKeyBoard(u, products)
 		return ret
 
 	case askedForKcal:
@@ -246,4 +240,15 @@ func errResponse(chatID int64, messageID int, text string) tgbotapi.MessageConfi
 	ret.Text = text
 	ret.ReplyToMessageID = messageID
 	return ret
+}
+
+func createKeyBoard(u *user, products []sqlite.Product) tgbotapi.InlineKeyboardMarkup {
+	u.keyBoardProducts = products
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for i, p := range products {
+		row := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
+			p.String(), strconv.Itoa(i)))
+		rows = append(rows, row)
+	}
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
