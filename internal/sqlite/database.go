@@ -37,9 +37,9 @@ func (d *DB) Close() {
 
 // Users of the bot.
 func (d *DB) Users() []User {
-	rows, err := d.db.Query("SELECT * FROM USER;")
+	rows, err := d.db.Query(selectUsers)
 	if err != nil {
-		log.Printf("'SELECT * FROM USER;' failed with: %q", err)
+		log.Printf("%q failed with: %q", selectUsers, err)
 		return nil
 	}
 	defer rows.Close()
@@ -60,9 +60,9 @@ func (d *DB) Users() []User {
 
 // Products saved in the bot.
 func (d *DB) Products() []Product {
-	rows, err := d.db.Query("SELECT LOWER(NAME), KCAL FROM PRODUCT;")
+	rows, err := d.db.Query(selectProducts)
 	if err != nil {
-		log.Printf("'SELECT LOWER(NAME), KCAL FROM PRODUCT;' failed with: %q", err)
+		log.Printf("%q failed with: %q", selectProducts, err)
 		return nil
 	}
 	defer rows.Close()

@@ -31,6 +31,10 @@ const insertProductQuery = `INSERT OR IGNORE INTO PRODUCT(name, kcal) values(?, 
 
 const insertReportQuery = `INSERT INTO REPORTS(user_id, time, product, kcal, grams) values(?, ?, ?, ?, ?);`
 
+const selectUsers = "SELECT ID, NAME, TIMEZONE, DAILY_LIMIT FROM USER;"
+
+const selectProducts = "SELECT LOWER(NAME), KCAL FROM PRODUCT;"
+
 const selectTodayQuery = "SELECT TIME, LOWER(PRODUCT), KCAL, GRAMS FROM REPORTS WHERE USER_ID=?1 AND GRAMS!=0 AND (TIME + ?2)/?3 = ?4;"
 
 const selectLastProducts = "SELECT MAX(TIME), LOWER(PRODUCT), KCAL FROM REPORTS group by LOWER(PRODUCT), KCAL order by time desc limit ?;"
